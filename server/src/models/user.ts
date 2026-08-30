@@ -7,6 +7,10 @@ export interface IUser extends Document {
   role: "student" | "recruiter" | "admin";
   avatar?: string;
   phone?: string;
+   bio: string;
+  college: string;
+  skills: string[];
+  resume: string;
   isVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +53,31 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: "",
     },
+
+    // Short introduction about the student
+bio: {
+  type: String,
+  default: "",
+},
+
+// Student's college name
+college: {
+  type: String,
+  default: "",
+},
+
+// List of technical skills
+skills: [
+  {
+    type: String,
+  },
+],
+
+// Resume URL (Cloudinary/local storage later)
+resume: {
+  type: String,
+  default: "",
+},
 
     isVerified: {
       type: Boolean,
