@@ -1,6 +1,6 @@
 import Application from "../models/application.model";
 import Job from "../models/job.model";
-
+import { createNotification } from "./notification.service";
 // Student applies for a job
 export const applyForJob = async (
   studentId: string,
@@ -107,6 +107,12 @@ export const updateApplicationStatus = async (
   application.status = status;
 
   await application.save();
+
+  await createNotification(
+    application.student.toString(),
+    `Your application status for "${job.title}" has been updated to ${status}.`,
+    "Application"
+  );
 
   return application;
 };

@@ -9,7 +9,10 @@ import applicationRoutes from "./routes/application.routes";
 import savedJobRoutes from "./routes/savedJob.routes";
 import recruiterDashboardRoutes from "./routes/recruiterDashboard.routes";
 import adminRoutes from "./routes/admin.routes";
+import notificationRoutes from "./routes/notification.routes";
+import path from "path";
 
+console.log("🔥 Notification routes imported");
 const app: Application = express();
 
 // Middleware
@@ -28,6 +31,11 @@ app.use(
   recruiterDashboardRoutes
 );
 app.use("/api/admin", adminRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use(
+  "/uploads",
+  express.static(path.join(process.cwd(), "uploads"))
+);
 
 // Health Check Route
 app.get("/", (req: Request, res: Response) => {

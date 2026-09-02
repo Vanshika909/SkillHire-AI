@@ -51,3 +51,18 @@ export const getAllUsers = async () => {
     .select("-password")
     .sort({ createdAt: -1 });
 };
+
+// Get all jobs
+export const getAllJobs = async () => {
+  return await Job.find()
+    .populate("recruiter", "name email")
+    .sort({ createdAt: -1 });
+};
+
+// Get all applications
+export const getAllApplications = async () => {
+  return await Application.find()
+    .populate("student", "name email")
+    .populate("job", "title company")
+    .sort({ createdAt: -1 });
+};

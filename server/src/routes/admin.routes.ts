@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { protect, authorize } from "../middleware/auth.middleware";
-import { getDashboard, getUsers, } from "../controllers/admin.controller";
+import { getDashboard, getUsers, getJobs, getApplications, } from "../controllers/admin.controller";
 
 const router = Router();
 
@@ -18,6 +18,21 @@ router.get(
   protect,
   authorize("admin"),
   getUsers
+);
+
+// Get all jobs
+router.get(
+  "/jobs",
+  protect,
+  authorize("admin"),
+  getJobs
+);
+
+router.get(
+  "/applications",
+  protect,
+  authorize("admin"),
+  getApplications
 );
 
 export default router;
