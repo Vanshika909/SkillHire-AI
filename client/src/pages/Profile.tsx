@@ -32,7 +32,10 @@ const Profile = () => {
 
   const token = localStorage.getItem("token");
 
-  // Fetch profile
+  // =========================
+  // FETCH PROFILE
+  // =========================
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -51,7 +54,9 @@ const Profile = () => {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load profile");
+          throw new Error(
+            result.message || "Failed to load profile"
+          );
         }
 
         const user = result.data;
@@ -67,7 +72,9 @@ const Profile = () => {
           resume: user.resume || "",
         });
       } catch (err: any) {
-        setError(err.message || "Failed to load profile");
+        setError(
+          err.message || "Failed to load profile"
+        );
       } finally {
         setLoading(false);
       }
@@ -81,7 +88,10 @@ const Profile = () => {
     }
   }, [token]);
 
-  // Input change
+  // =========================
+  // INPUT CHANGE
+  // =========================
+
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement
@@ -95,7 +105,104 @@ const Profile = () => {
     }));
   };
 
-  // Update profile
+  // =========================
+  // PROFILE PICTURE UPLOAD
+  // =========================
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError(
+        "Only JPG, JPEG, PNG and WEBP images are allowed."
+      );
+
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError(
+        "Profile picture must be smaller than 5 MB."
+      );
+
+      e.target.value = "";
+      return;
+    }
+
+    if (!token) {
+      setError("Please login first.");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+      setMessage("");
+
+      const uploadData = new FormData();
+
+      uploadData.append("avatar", file);
+
+      const response = await fetch(
+        "http://localhost:5000/api/student/profile/avatar",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: uploadData,
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message ||
+            "Profile picture upload failed"
+        );
+      }
+
+      // Update profile immediately
+      setProfile(result.data);
+
+      setMessage(
+        "Profile picture updated successfully!"
+      );
+    } catch (err: any) {
+      console.error(
+        "Profile picture upload error:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Failed to upload profile picture"
+      );
+    } finally {
+      setSaving(false);
+
+      // Allows selecting the same image again
+      e.target.value = "";
+    }
+  };
+
+  // =========================
+  // UPDATE PROFILE
+  // =========================
+
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement>
   ) => {
@@ -133,7 +240,10 @@ const Profile = () => {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to update profile");
+        throw new Error(
+          result.message ||
+            "Failed to update profile"
+        );
       }
 
       setProfile(result.data);
@@ -143,17 +253,27 @@ const Profile = () => {
         phone: result.data.phone || "",
         college: result.data.college || "",
         bio: result.data.bio || "",
-        skills: result.data.skills?.join(", ") || "",
+        skills:
+          result.data.skills?.join(", ") || "",
         resume: result.data.resume || "",
       });
 
-      setMessage("Profile updated successfully!");
+      setMessage(
+        "Profile updated successfully!"
+      );
     } catch (err: any) {
-      setError(err.message || "Failed to update profile");
+      setError(
+        err.message ||
+          "Failed to update profile"
+      );
     } finally {
       setSaving(false);
     }
   };
+
+  // =========================
+  // LOADING
+  // =========================
 
   if (loading) {
     return (
@@ -164,6 +284,10 @@ const Profile = () => {
       </div>
     );
   }
+
+  // =========================
+  // ERROR
+  // =========================
 
   if (error && !profile) {
     return (
@@ -177,6 +301,10 @@ const Profile = () => {
 
   if (!profile) return null;
 
+  // =========================
+  // INITIALS
+  // =========================
+
   const initials = profile.name
     ? profile.name
         .split(" ")
@@ -186,35 +314,84 @@ const Profile = () => {
         .toUpperCase()
     : "U";
 
+  // =========================
+  // RETURN
+  // =========================
+
   return (
     <div className="profile-page">
 
-      {/* Header */}
+      {/* =========================
+          HEADER
+          ========================= */}
+
       <div className="profile-header">
         <div>
           <h1>My Profile</h1>
+
           <p>
-            Manage your personal information and career details.
+            Manage your personal information and
+            career details.
           </p>
         </div>
       </div>
 
-      {/* Profile overview */}
+      {/* =========================
+          PROFILE OVERVIEW
+          ========================= */}
+
       <div className="profile-overview">
 
-        <div className="profile-avatar">
-          {profile.avatar ? (
-            <img
-              src={profile.avatar}
-              alt="Profile"
-            />
-          ) : (
-            initials
-          )}
+        {/* Avatar Section */}
+
+        <div className="profile-avatar-wrapper">
+
+          <div className="profile-avatar">
+
+            {profile.avatar ? (
+              <img
+                src={`http://localhost:5000${profile.avatar}`}
+                alt="Profile"
+              />
+            ) : (
+              initials
+            )}
+
+          </div>
+
+          {/* Upload Input */}
+
+          <input
+            type="file"
+            id="profile-picture-upload"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
+            onChange={handleAvatarUpload}
+            hidden
+          />
+
+          {/* Upload Button */}
+
+          <label
+            htmlFor="profile-picture-upload"
+            className="upload-avatar-button"
+          >
+            📷 {saving
+              ? "Uploading..."
+              : "Change Photo"}
+          </label>
+
+          <span className="avatar-help">
+            JPG, PNG or WEBP · Max 5 MB
+          </span>
+
         </div>
 
+        {/* Basic Information */}
+
         <div className="profile-basic-info">
+
           <h2>{profile.name}</h2>
+
           <p>{profile.email}</p>
 
           {profile.college && (
@@ -222,11 +399,15 @@ const Profile = () => {
               🎓 {profile.college}
             </span>
           )}
+
         </div>
 
       </div>
 
-      {/* Messages */}
+      {/* =========================
+          MESSAGES
+          ========================= */}
+
       {message && (
         <div className="profile-success">
           ✓ {message}
@@ -239,22 +420,35 @@ const Profile = () => {
         </div>
       )}
 
-      {/* Form */}
+      {/* =========================
+          PROFILE FORM
+          ========================= */}
+
       <form
         className="profile-form"
         onSubmit={handleSubmit}
       >
 
+        {/* =========================
+            PERSONAL INFORMATION
+            ========================= */}
+
         <div className="profile-section">
+
           <h2>Personal Information</h2>
+
           <p>
             Update your personal details.
           </p>
 
           <div className="profile-grid">
 
+            {/* Full Name */}
+
             <div className="form-group">
+
               <label>Full Name</label>
+
               <input
                 type="text"
                 name="name"
@@ -263,22 +457,33 @@ const Profile = () => {
                 placeholder="Enter your name"
                 required
               />
+
             </div>
 
+            {/* Email */}
+
             <div className="form-group">
+
               <label>Email</label>
+
               <input
                 type="email"
                 value={profile.email}
                 disabled
               />
+
               <small>
                 Email cannot be changed.
               </small>
+
             </div>
 
+            {/* Phone */}
+
             <div className="form-group">
+
               <label>Phone</label>
+
               <input
                 type="text"
                 name="phone"
@@ -286,10 +491,15 @@ const Profile = () => {
                 onChange={handleChange}
                 placeholder="Enter phone number"
               />
+
             </div>
 
+            {/* College */}
+
             <div className="form-group">
+
               <label>College</label>
+
               <input
                 type="text"
                 name="college"
@@ -297,19 +507,29 @@ const Profile = () => {
                 onChange={handleChange}
                 placeholder="Enter college name"
               />
+
             </div>
 
           </div>
         </div>
 
-        {/* Career information */}
+        {/* =========================
+            CAREER INFORMATION
+            ========================= */}
+
         <div className="profile-section">
+
           <h2>Career Information</h2>
+
           <p>
-            Tell recruiters about your skills and experience.
+            Tell recruiters about your skills and
+            experience.
           </p>
 
+          {/* Skills */}
+
           <div className="form-group">
+
             <label>Skills</label>
 
             <input
@@ -323,9 +543,13 @@ const Profile = () => {
             <small>
               Separate skills using commas.
             </small>
+
           </div>
 
+          {/* Bio */}
+
           <div className="form-group">
+
             <label>Bio</label>
 
             <textarea
@@ -335,113 +559,174 @@ const Profile = () => {
               placeholder="Write a short introduction about yourself..."
               rows={5}
             />
+
           </div>
 
-        <div className="form-group">
-  <label>Resume</label>
+          {/* =========================
+              RESUME
+              ========================= */}
 
-  <div className="resume-upload-box">
-    <input
-      type="file"
-      id="resume-upload"
-      accept="application/pdf,.pdf"
-      onChange={async (e) => {
-        const file = e.target.files?.[0];
+          <div className="form-group">
 
-        if (!file) return;
+            <label>Resume</label>
 
-        if (file.type !== "application/pdf") {
-          setError("Only PDF files are allowed.");
-          return;
-        }
+            <div className="resume-upload-box">
 
-        if (file.size > 5 * 1024 * 1024) {
-          setError("Resume must be smaller than 5 MB.");
-          return;
-        }
+              <input
+                type="file"
+                id="resume-upload"
+                accept="application/pdf,.pdf"
+                onChange={async (e) => {
 
-        try {
-          setSaving(true);
-          setError("");
-          setMessage("");
+                  const file =
+                    e.target.files?.[0];
 
-          const uploadData = new FormData();
-          uploadData.append("resume", file);
+                  if (!file) return;
 
-          const response = await fetch(
-            "http://localhost:5000/api/student/profile/resume",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-              body: uploadData,
-            }
-          );
+                  if (
+                    file.type !==
+                    "application/pdf"
+                  ) {
+                    setError(
+                      "Only PDF files are allowed."
+                    );
+                    return;
+                  }
 
-          const result = await response.json();
+                  if (
+                    file.size >
+                    5 * 1024 * 1024
+                  ) {
+                    setError(
+                      "Resume must be smaller than 5 MB."
+                    );
+                    return;
+                  }
 
-          if (!response.ok || !result.success) {
-            throw new Error(
-              result.message || "Resume upload failed"
-            );
-          }
+                  try {
 
-          setProfile(result.data);
+                    setSaving(true);
+                    setError("");
+                    setMessage("");
 
-          setFormData((prev) => ({
-            ...prev,
-            resume: result.resumeUrl,
-          }));
+                    const uploadData =
+                      new FormData();
 
-          setMessage("Resume uploaded successfully!");
-        } catch (err: any) {
-          setError(
-            err.message || "Failed to upload resume"
-          );
-        } finally {
-          setSaving(false);
-        }
-      }}
-    />
+                    uploadData.append(
+                      "resume",
+                      file
+                    );
 
-    <label
-      htmlFor="resume-upload"
-      className="upload-resume-button"
-    >
-      📄 Upload Resume
-    </label>
+                    const response =
+                      await fetch(
+                        "http://localhost:5000/api/student/profile/resume",
+                        {
+                          method: "POST",
+                          headers: {
+                            Authorization:
+                              `Bearer ${token}`,
+                          },
+                          body: uploadData,
+                        }
+                      );
 
-    <span className="resume-help">
-      PDF only · Maximum 5 MB
-    </span>
-    </div>
+                    const result =
+                      await response.json();
 
-    {profile.resume && (
-    <a
-      href={`http://localhost:5000${profile.resume}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="resume-view-link"
-    >
-      👁 View Current Resume
-    </a>
-    )}
+                    if (
+                      !response.ok ||
+                      !result.success
+                    ) {
+                      throw new Error(
+                        result.message ||
+                          "Resume upload failed"
+                      );
+                    }
+
+                    setProfile(
+                      result.data
+                    );
+
+                    setFormData(
+                      (prev) => ({
+                        ...prev,
+                        resume:
+                          result.resumeUrl,
+                      })
+                    );
+
+                    setMessage(
+                      "Resume uploaded successfully!"
+                    );
+
+                  } catch (
+                    err: any
+                  ) {
+
+                    setError(
+                      err.message ||
+                        "Failed to upload resume"
+                    );
+
+                  } finally {
+
+                    setSaving(false);
+
+                  }
+
+                }}
+              />
+
+              <label
+                htmlFor="resume-upload"
+                className="upload-resume-button"
+              >
+                📄 Upload Resume
+              </label>
+
+              <span className="resume-help">
+                PDF only · Maximum 5 MB
+              </span>
+
+            </div>
+
+            {/* Current Resume */}
+
+            {profile.resume && (
+              <a
+                href={`http://localhost:5000${profile.resume}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="resume-view-link"
+              >
+                👁 View Current Resume
+              </a>
+            )}
+
+          </div>
+
         </div>
-        </div>
 
-        {/* Buttons */}
+        {/* =========================
+            SAVE BUTTON
+            ========================= */}
+
         <div className="profile-form-actions">
+
           <button
             type="submit"
             className="save-profile-button"
             disabled={saving}
           >
-            {saving ? "Saving..." : "Save Changes"}
+            {saving
+              ? "Saving..."
+              : "Save Changes"}
           </button>
+
         </div>
 
       </form>
+
     </div>
   );
 };

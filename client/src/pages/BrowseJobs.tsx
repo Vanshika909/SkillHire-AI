@@ -4,86 +4,41 @@ import "./BrowseJobs.css";
 interface Job {
   _id: string;
   title: string;
-  company: string;
-  description: string;
-  location: string;
-  salary: number;
-  employmentType: "Full-Time" | "Part-Time" | "Internship" | "Remote";
-  experience: string;
-  skills: string[];
-  recruiter: string;
-  createdAt: string;
+  company?: string;
+  description?: string;
+  location?: string;
+  salary?: number;
+  employmentType?: string;
+  experience?: string;
+  skills?: string[];
+  recruiter?: any;
+  createdAt?: string;
 }
 
-interface JobsResponse {
-  success: boolean;
-  count: number;
-  total: number;
-  data: Job[];
-}
+const API_URL = "http://localhost:5000/api";
 
-function BrowseJobs() {
+const BrowseJobs = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
   const [location, setLocation] = useState("");
   const [employmentType, setEmploymentType] = useState("");
   const [experience, setExperience] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+
+  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(
+    new Set()
+  );
+
+  const [savingJobId, setSavingJobId] = useState<string | null>(null);
+  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
 
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [applyingJobId, setApplyingJobId] = useState<string | null>(null);
-  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(
-  new Set()
-);
-const [savingJobId, setSavingJobId] = useState<string | null>(null);
-
-  const [sortBy, setSortBy] = useState("Best Match");
-
-  // =========================
-// FETCH SAVED JOBS
-// =========================
-
-const fetchSavedJobs = async () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    return;
-  }
-
-  try {
-    const response = await fetch(
-      "http://localhost:5000/api/saved-jobs/",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch saved jobs");
-    }
-
-    const result = await response.json();
-
-    if (result.success) {
-      const ids = new Set<string>(
-        result.data.map((item: any) => item.job?._id)
-      );
-
-      setSavedJobIds(ids);
-    }
-  } catch (err) {
-    console.error("Fetch saved jobs error:", err);
-  }
-};
 
   // =========================
   // FETCH JOBS
   // =========================
-
   useEffect(() => {
     fetchJobs();
     fetchSavedJobs();
@@ -92,147 +47,222 @@ const fetchSavedJobs = async () => {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      setError("");
 
-      const response = await fetch("http://localhost:5000/api/jobs");
+      const response = await fetch(`${API_URL}/jobs`);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch jobs");
-      }
-
-      const result: JobsResponse = await response.json();
+      const result = await response.json();
 
       if (result.success) {
-        setJobs(result.data);
+        setJobs(result.data || []);
       } else {
-        setError("Unable to load jobs.");
+        console.error(result.message);
       }
-    } catch (err) {
-      console.error("Fetch jobs error:", err);
-      setError(
-        "Unable to connect to the server. Make sure your backend is running."
-      );
+    } catch (error) {
+      console.error("Failed to fetch jobs:", error);
     } finally {
       setLoading(false);
     }
   };
 
   // =========================
-// SAVE / UNSAVE JOB
-// =========================
+  // FETCH SAVED JOBS
+  // =========================
+  const fetchSavedJobs = async () => {
+    try {
+      const token = localStorage.getItem("token");
 
-const toggleSaveJob = async (jobId: string) => {
-  const token = localStorage.getItem("token");
+      if (!token) return;
 
-  if (!token) {
-    alert("Please login as a student to save jobs.");
-    return;
-  }
-
-  const isSaved = savedJobIds.has(jobId);
-
-  try {
-    setSavingJobId(jobId);
-
-    const response = await fetch(
-      isSaved
-        ? `http://localhost:5000/api/saved-jobs/${jobId}`
-        : `http://localhost:5000/api/saved-jobs/${jobId}`,
-      {
-        method: isSaved ? "DELETE" : "POST",
+      const response = await fetch(`${API_URL}/saved-jobs/`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
         },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const ids = new Set<string>();
+
+        (result.data || []).forEach((saved: any) => {
+          if (saved.job?._id) {
+            ids.add(saved.job._id);
+          }
+        });
+
+        setSavedJobIds(ids);
       }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(
-        result.message || "Unable to update saved job"
-      );
+    } catch (error) {
+      console.error("Failed to fetch saved jobs:", error);
     }
+  };
 
-    setSavedJobIds((previous) => {
-      const updated = new Set(previous);
+  // =========================
+  // SAVE / UNSAVE JOB
+  // =========================
+  const toggleSaveJob = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem("token");
 
-      if (isSaved) {
-        updated.delete(jobId);
-      } else {
-        updated.add(jobId);
+      if (!token) {
+        alert("Please login first.");
+        return;
       }
 
-      return updated;
-    });
-  } catch (err: any) {
-    console.error("Save job error:", err);
+      setSavingJobId(jobId);
 
-    alert(
-      err.message || "Something went wrong while saving the job."
-    );
-  } finally {
-    setSavingJobId(null);
-  }
-};
-  // =========================
-  // FILTER JOBS
-  // =========================
+      const isSaved = savedJobIds.has(jobId);
 
+      const response = await fetch(
+        `${API_URL}/saved-jobs/${jobId}`,
+        {
+          method: isSaved ? "DELETE" : "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        alert(result.message || "Something went wrong.");
+        return;
+      }
+
+      setSavedJobIds((previous) => {
+        const updated = new Set(previous);
+
+        if (isSaved) {
+          updated.delete(jobId);
+        } else {
+          updated.add(jobId);
+        }
+
+        return updated;
+      });
+    } catch (error) {
+      console.error("Save job error:", error);
+      alert("Unable to update saved job.");
+    } finally {
+      setSavingJobId(null);
+    }
+  };
+
+  // =========================
+  // APPLY FOR JOB
+  // =========================
+  const applyForJob = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        alert("Please login first.");
+        return;
+      }
+
+      setApplyingJobId(jobId);
+
+      const response = await fetch(
+        `${API_URL}/applications/${jobId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            coverLetter: "",
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        alert(result.message || "Unable to apply.");
+        return;
+      }
+
+      alert("Application submitted successfully!");
+
+      setSelectedJob(null);
+    } catch (error) {
+      console.error("Application error:", error);
+      alert("Unable to submit application.");
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
+
+  // =========================
+  // FILTER + SORT
+  // =========================
   const filteredJobs = useMemo(() => {
     let result = [...jobs];
 
-    const searchText = search.toLowerCase().trim();
-    const locationText = location.toLowerCase().trim();
+    // Search
+    if (search.trim()) {
+      const searchValue = search.toLowerCase();
 
-    if (searchText) {
       result = result.filter((job) => {
-        const searchableText = [
-          job.title,
-          job.company,
-          job.description,
-          ...job.skills,
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return searchableText.includes(searchText);
+        return (
+          job.title?.toLowerCase().includes(searchValue) ||
+          job.company?.toLowerCase().includes(searchValue) ||
+          job.description?.toLowerCase().includes(searchValue) ||
+          job.skills?.some((skill) =>
+            skill.toLowerCase().includes(searchValue)
+          )
+        );
       });
     }
 
-    if (locationText) {
-      result = result.filter((job) =>
-        job.location.toLowerCase().includes(locationText)
+    // Location
+    if (location) {
+      result = result.filter(
+        (job) =>
+          job.location?.toLowerCase() === location.toLowerCase()
       );
     }
 
+    // Employment Type
     if (employmentType) {
       result = result.filter(
-        (job) => job.employmentType === employmentType
+        (job) =>
+          job.employmentType?.toLowerCase() ===
+          employmentType.toLowerCase()
       );
     }
 
+    // Experience
     if (experience) {
-      result = result.filter((job) =>
-        job.experience.toLowerCase().includes(experience.toLowerCase())
+      result = result.filter(
+        (job) =>
+          job.experience?.toLowerCase() ===
+          experience.toLowerCase()
       );
     }
 
-    if (sortBy === "Newest") {
+    // Sort
+    if (sortBy === "newest") {
       result.sort(
         (a, b) =>
-          new Date(b.createdAt).getTime() -
-          new Date(a.createdAt).getTime()
+          new Date(b.createdAt || 0).getTime() -
+          new Date(a.createdAt || 0).getTime()
       );
     }
 
-    if (sortBy === "Salary: High to Low") {
-      result.sort((a, b) => b.salary - a.salary);
+    if (sortBy === "salary-high") {
+      result.sort(
+        (a, b) => (b.salary || 0) - (a.salary || 0)
+      );
     }
 
-    if (sortBy === "Salary: Low to High") {
-      result.sort((a, b) => a.salary - b.salary);
+    if (sortBy === "salary-low") {
+      result.sort(
+        (a, b) => (a.salary || 0) - (b.salary || 0)
+      );
     }
 
     return result;
@@ -246,153 +276,123 @@ const toggleSaveJob = async (jobId: string) => {
   ]);
 
   // =========================
-  // APPLY FOR JOB
+  // UNIQUE FILTER OPTIONS
   // =========================
+  const locations = Array.from(
+    new Set(
+      jobs
+        .map((job) => job.location)
+        .filter(Boolean)
+    )
+  );
 
-  const applyForJob = async (jobId: string) => {
-    const token = localStorage.getItem("token");
+  const employmentTypes = Array.from(
+    new Set(
+      jobs
+        .map((job) => job.employmentType)
+        .filter(Boolean)
+    )
+  );
 
-    if (!token) {
-      alert("Please login as a student before applying.");
-      return;
-    }
+  const experiences = Array.from(
+    new Set(
+      jobs
+        .map((job) => job.experience)
+        .filter(Boolean)
+    )
+  );
 
-    try {
-      setApplyingJobId(jobId);
+  // =========================
+  // FORMAT SALARY
+  // =========================
+  const formatSalary = (salary?: number) => {
+    if (!salary) return "Not disclosed";
 
-      const response = await fetch(
-        `http://localhost:5000/api/applications/${jobId}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            coverLetter: "",
-          }),
-        }
-      );
+    return `₹${salary.toLocaleString("en-IN")}`;
+  };
 
-      const result = await response.json();
+  // =========================
+  // COMPANY INITIAL
+  // =========================
+  const getCompanyInitial = (company?: string) => {
+    if (!company) return "C";
 
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Unable to submit application"
-        );
-      }
-
-      alert("Application submitted successfully! 🎉");
-
-      setSelectedJob(null);
-    } catch (err: any) {
-      console.error("Application error:", err);
-
-      alert(
-        err.message ||
-          "Something went wrong while submitting your application."
-      );
-    } finally {
-      setApplyingJobId(null);
-    }
+    return company.charAt(0).toUpperCase();
   };
 
   // =========================
   // CLEAR FILTERS
   // =========================
-
   const clearFilters = () => {
     setSearch("");
     setLocation("");
     setEmploymentType("");
     setExperience("");
-    setSortBy("Best Match");
-  };
-
-  // =========================
-  // FORMAT SALARY
-  // =========================
-
-  const formatSalary = (salary: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(salary);
-  };
-
-  // =========================
-  // JOB AGE
-  // =========================
-
-  const getJobAge = (createdAt: string) => {
-    const created = new Date(createdAt).getTime();
-    const now = Date.now();
-
-    const hours = Math.floor(
-      (now - created) / (1000 * 60 * 60)
-    );
-
-    if (hours < 1) {
-      return "Posted just now";
-    }
-
-    if (hours < 24) {
-      return `Posted ${hours} hour${hours === 1 ? "" : "s"} ago`;
-    }
-
-    const days = Math.floor(hours / 24);
-
-    return `Posted ${days} day${days === 1 ? "" : "s"} ago`;
+    setSortBy("newest");
   };
 
   return (
-    <div className="browse-page">
+    <div className="browse-jobs-page">
 
-      {/* ================= HEADER ================= */}
+      {/* =========================
+          HERO
+      ========================= */}
+      <section className="jobs-hero">
 
-      <section className="browse-hero">
-        <div>
+        <div className="hero-content">
+          <span className="hero-label">
+            OPPORTUNITIES
+          </span>
+
           <h1>
-            Find Your Next{" "}
-            <span>Breakthrough</span>
+            Find Your Next
+            <span> Opportunity</span>
           </h1>
 
           <p>
-            Discover AI-curated opportunities matching your unique
-            skills.
+            Discover jobs that match your skills,
+            experience and career goals.
           </p>
         </div>
 
-        <div className="search-area">
+        {/* SEARCH */}
+        <div className="job-search-container">
 
           <div className="search-box">
-            <span>⌕</span>
+
+            <span className="search-icon">
+              🔍
+            </span>
 
             <input
               type="text"
-              placeholder="Job title, keywords, or company..."
+              placeholder="Search jobs, companies or skills..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
             />
+
           </div>
 
-          <div className="search-box location-box">
-            <span>⌖</span>
+          <div className="search-location">
+
+            <span>📍</span>
 
             <input
               type="text"
-              placeholder="Location..."
+              placeholder="Location"
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) =>
+                setLocation(e.target.value)
+              }
             />
+
           </div>
 
           <button
             className="search-button"
-            onClick={() => {
-              // Filtering happens automatically.
-            }}
+            onClick={() => {}}
           >
             Search Jobs
           </button>
@@ -400,15 +400,17 @@ const toggleSaveJob = async (jobId: string) => {
         </div>
       </section>
 
-      {/* ================= MAIN CONTENT ================= */}
-
+      {/* =========================
+          MAIN CONTENT
+      ========================= */}
       <div className="jobs-layout">
 
-        {/* ================= SIDEBAR FILTERS ================= */}
+        {/* =========================
+            SIDEBAR
+        ========================= */}
+        <aside className="jobs-sidebar">
 
-        <aside className="filters-card">
-
-          <div className="filters-header">
+          <div className="filter-header">
             <h3>Filters</h3>
 
             <button onClick={clearFilters}>
@@ -417,357 +419,314 @@ const toggleSaveJob = async (jobId: string) => {
           </div>
 
           {/* Employment Type */}
-
           <div className="filter-section">
 
-            <h4>EMPLOYMENT TYPE</h4>
+            <h4>Employment Type</h4>
 
-            <label>
-              <input
-                type="radio"
-                name="employment"
-                checked={employmentType === ""}
-                onChange={() => setEmploymentType("")}
-              />
-              <span>All Jobs</span>
-            </label>
+            <select
+              value={employmentType}
+              onChange={(e) =>
+                setEmploymentType(e.target.value)
+              }
+            >
+              <option value="">
+                All Types
+              </option>
 
-            <label>
-              <input
-                type="radio"
-                name="employment"
-                checked={employmentType === "Full-Time"}
-                onChange={() =>
-                  setEmploymentType("Full-Time")
-                }
-              />
-              <span>Full-Time</span>
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                name="employment"
-                checked={employmentType === "Part-Time"}
-                onChange={() =>
-                  setEmploymentType("Part-Time")
-                }
-              />
-              <span>Part-Time</span>
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                name="employment"
-                checked={employmentType === "Internship"}
-                onChange={() =>
-                  setEmploymentType("Internship")
-                }
-              />
-              <span>Internship</span>
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                name="employment"
-                checked={employmentType === "Remote"}
-                onChange={() =>
-                  setEmploymentType("Remote")
-                }
-              />
-              <span>Remote</span>
-            </label>
+              {employmentTypes.map((type) => (
+                <option
+                  key={type}
+                  value={type}
+                >
+                  {type}
+                </option>
+              ))}
+            </select>
 
           </div>
 
           {/* Experience */}
-
           <div className="filter-section">
 
-            <h4>EXPERIENCE LEVEL</h4>
+            <h4>Experience</h4>
 
-            <label>
-              <input
-                type="radio"
-                name="experience"
-                checked={experience === ""}
-                onChange={() => setExperience("")}
-              />
-              <span>All Levels</span>
-            </label>
+            <select
+              value={experience}
+              onChange={(e) =>
+                setExperience(e.target.value)
+              }
+            >
+              <option value="">
+                All Experience
+              </option>
 
-            <label>
-              <input
-                type="radio"
-                name="experience"
-                checked={experience === "0-2"}
-                onChange={() => setExperience("0-2")}
-              />
-              <span>Entry Level</span>
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                name="experience"
-                checked={experience === "2-5"}
-                onChange={() => setExperience("2-5")}
-              />
-              <span>Mid Level</span>
-            </label>
-
-            <label>
-              <input
-                type="radio"
-                name="experience"
-                checked={experience === "5+"}
-                onChange={() => setExperience("5+")}
-              />
-              <span>Senior Level</span>
-            </label>
+              {experiences.map((item) => (
+                <option
+                  key={item}
+                  value={item}
+                >
+                  {item}
+                </option>
+              ))}
+            </select>
 
           </div>
 
-          {/* Quick Info */}
+          {/* Location */}
+          <div className="filter-section">
 
+            <h4>Location</h4>
+
+            <select
+              value={location}
+              onChange={(e) =>
+                setLocation(e.target.value)
+              }
+            >
+              <option value="">
+                All Locations
+              </option>
+
+              {locations.map((item) => (
+                <option
+                  key={item}
+                  value={item}
+                >
+                  {item}
+                </option>
+              ))}
+            </select>
+
+          </div>
+
+          {/* QUICK TIP */}
           <div className="ai-filter-box">
-            <div className="ai-icon">✦</div>
+
+            <div className="ai-icon">
+              ✓
+            </div>
 
             <div>
-              <strong>AI Matching</strong>
+              <strong>
+                Quick Tip
+              </strong>
 
               <p>
-                AI recommendations will appear based on your
-                skills and profile.
+                Use filters and search to quickly
+                find jobs that match your
+                preferences.
               </p>
             </div>
+
           </div>
 
         </aside>
 
-        {/* ================= JOB RESULTS ================= */}
-
+        {/* =========================
+            JOBS CONTENT
+        ========================= */}
         <main className="jobs-content">
 
-          <div className="results-header">
+          {/* HEADER */}
+          <div className="jobs-header">
 
             <div>
-              <strong>
-                Showing {filteredJobs.length} jobs
-              </strong>
+              <h2>
+                Available Jobs
+              </h2>
+
+              <p>
+                {filteredJobs.length} jobs found
+              </p>
             </div>
 
-            <div className="sort-container">
+            <select
+              className="sort-select"
+              value={sortBy}
+              onChange={(e) =>
+                setSortBy(e.target.value)
+              }
+            >
+              <option value="newest">
+                Newest
+              </option>
 
-              <span>Sort by:</span>
+              <option value="salary-high">
+                Salary: High to Low
+              </option>
 
-              <select
-                value={sortBy}
-                onChange={(e) =>
-                  setSortBy(e.target.value)
-                }
-              >
-                <option>Best Match</option>
-                <option>Newest</option>
-                <option>Salary: High to Low</option>
-                <option>Salary: Low to High</option>
-              </select>
-
-            </div>
+              <option value="salary-low">
+                Salary: Low to High
+              </option>
+            </select>
 
           </div>
 
-          {/* Loading */}
-
+          {/* LOADING */}
           {loading && (
-            <div className="status-box">
-              <div className="spinner"></div>
-              <p>Finding the best jobs for you...</p>
+            <div className="jobs-loading">
+              <div className="loading-spinner"></div>
+              <p>Loading jobs...</p>
             </div>
           )}
 
-          {/* Error */}
-
-          {!loading && error && (
-            <div className="error-box">
-              <div className="error-icon">!</div>
-
-              <h3>Unable to load jobs</h3>
-
-              <p>{error}</p>
-
-              <button onClick={fetchJobs}>
-                Try Again
-              </button>
-            </div>
-          )}
-
-          {/* No jobs */}
-
+          {/* EMPTY */}
           {!loading &&
-            !error &&
             filteredJobs.length === 0 && (
-              <div className="empty-box">
+              <div className="no-jobs">
 
-                <div className="empty-icon">
+                <div className="no-jobs-icon">
                   🔍
                 </div>
 
-                <h3>No jobs found</h3>
+                <h3>
+                  No jobs found
+                </h3>
 
                 <p>
-                  Try changing your search or filters.
+                  Try changing your search
+                  or filters.
                 </p>
 
-                <button onClick={clearFilters}>
+                <button
+                  onClick={clearFilters}
+                >
                   Clear Filters
                 </button>
 
               </div>
             )}
 
-          {/* Jobs */}
-
+          {/* JOB CARDS */}
           {!loading &&
-            !error &&
             filteredJobs.map((job) => (
-              <article
+
+              <div
                 className="job-card"
                 key={job._id}
               >
 
-                {/* Match Badge */}
-
-                <div className="match-badge">
-                  ✦ AI Match
+                {/* COMPANY LOGO */}
+                <div className="company-logo">
+                  {getCompanyInitial(
+                    job.company
+                  )}
                 </div>
 
-                {/* Job Header */}
+                {/* JOB INFO */}
+                <div className="job-main-info">
 
-                <div className="job-main">
+                  <div className="job-title-row">
 
-                  <div className="company-logo">
-                    {job.company
-                      .charAt(0)
-                      .toUpperCase()}
+                    <h3>
+                      {job.title}
+                    </h3>
+
+                    {/* NORMAL JOB TYPE */}
+                    <div className="match-badge">
+                      {job.employmentType ||
+                        "Job"}
+                    </div>
+
                   </div>
 
-                  <div className="job-title-area">
+                  <p className="job-company">
+                    {job.company ||
+                      "Company"}
+                  </p>
 
-                    <h2>{job.title}</h2>
+                  <div className="job-meta">
 
-                    <p className="company-name">
-                      {job.company}
-                    </p>
-
-                  </div>
-
-                </div>
-
-                {/* Job Info */}
-
-                <div className="job-info">
-
-                  <span>
-                    📍 {job.location}
-                  </span>
-
-                  <span>
-                    💼 {job.employmentType}
-                  </span>
-
-                  <span>
-                    💰 {formatSalary(job.salary)}
-                  </span>
-
-                  <span>
-                    🎓 {job.experience}
-                  </span>
-
-                </div>
-
-                {/* Skills */}
-
-                <div className="skills">
-
-                  {job.skills.map((skill) => (
-                    <span
-                      className="skill-tag"
-                      key={skill}
-                    >
-                      {skill}
+                    <span>
+                      📍{" "}
+                      {job.location ||
+                        "Remote"}
                     </span>
-                  ))}
 
-                </div>
+                    <span>
+                      💼{" "}
+                      {job.experience ||
+                        "Not specified"}
+                    </span>
 
-                {/* Footer */}
+                    <span>
+                      💰{" "}
+                      {formatSalary(
+                        job.salary
+                      )}
+                    </span>
 
-                <div className="job-footer">
+                  </div>
 
-                  <span className="posted-time">
-                    {getJobAge(job.createdAt)}
-                  </span>
+                  {/* SKILLS */}
+                  <div className="job-skills">
 
-                  <div className="job-actions">
-
-                    <button
-                        className={`save-button ${
-                          savedJobIds.has(job._id) ? "saved" : ""
-                        }`}
-                        title={
-                          savedJobIds.has(job._id)
-                            ? "Remove from saved jobs"
-                            : "Save Job"
-                        }
-                        disabled={savingJobId === job._id}
-                        onClick={() => toggleSaveJob(job._id)}
-                        >                     
-                        {savedJobIds.has(job._id) ? "♥" : "♡"}
-                      </button>
-
-                    <button
-                      className="view-button"
-                      onClick={() =>
-                        setSelectedJob(job)
-                      }
-                    >
-                      View Details
-                    </button>
-
-                    <button
-                      className="apply-button"
-                      disabled={
-                        applyingJobId === job._id
-                      }
-                      onClick={() =>
-                        applyForJob(job._id)
-                      }
-                    >
-                      {applyingJobId === job._id
-                        ? "Applying..."
-                        : "Apply Now"}
-                    </button>
+                    {(job.skills || [])
+                      .slice(0, 5)
+                      .map((skill) => (
+                        <span
+                          key={skill}
+                          className="skill-tag"
+                        >
+                          {skill}
+                        </span>
+                      ))}
 
                   </div>
 
                 </div>
 
-              </article>
+                {/* ACTIONS */}
+                <div className="job-actions">
+
+                  <button
+                    className={`save-button ${
+                      savedJobIds.has(job._id)
+                        ? "saved"
+                        : ""
+                    }`}
+                    disabled={
+                      savingJobId === job._id
+                    }
+                    onClick={() =>
+                      toggleSaveJob(
+                        job._id
+                      )
+                    }
+                  >
+                    {savedJobIds.has(job._id)
+                      ? "♥"
+                      : "♡"}
+                  </button>
+
+                  <button
+                    className="view-job-button"
+                    onClick={() =>
+                      setSelectedJob(job)
+                    }
+                  >
+                    View Details
+                  </button>
+
+                </div>
+
+              </div>
+
             ))}
 
         </main>
-
       </div>
 
-      {/* ================= JOB DETAILS MODAL ================= */}
-
+      {/* =========================
+          JOB DETAILS MODAL
+      ========================= */}
       {selectedJob && (
+
         <div
-          className="modal-overlay"
-          onClick={() => setSelectedJob(null)}
+          className="job-modal-overlay"
+          onClick={() =>
+            setSelectedJob(null)
+          }
         >
 
           <div
@@ -777,8 +736,9 @@ const toggleSaveJob = async (jobId: string) => {
             }
           >
 
+            {/* CLOSE */}
             <button
-              className="close-modal"
+              className="modal-close"
               onClick={() =>
                 setSelectedJob(null)
               }
@@ -786,103 +746,151 @@ const toggleSaveJob = async (jobId: string) => {
               ×
             </button>
 
-            <div className="modal-logo">
-              {selectedJob.company
-                .charAt(0)
-                .toUpperCase()}
-            </div>
+            {/* HEADER */}
+            <div className="modal-header">
 
-            <h2>{selectedJob.title}</h2>
-
-            <p className="modal-company">
-              {selectedJob.company}
-            </p>
-
-            <div className="modal-details">
-
-              <div>
-                <strong>Location</strong>
-                <span>
-                  📍 {selectedJob.location}
-                </span>
+              <div className="modal-company-logo">
+                {getCompanyInitial(
+                  selectedJob.company
+                )}
               </div>
 
               <div>
-                <strong>Salary</strong>
-                <span>
-                  💰 {formatSalary(selectedJob.salary)}
-                </span>
-              </div>
+                <h2>
+                  {selectedJob.title}
+                </h2>
 
-              <div>
-                <strong>Employment</strong>
-                <span>
-                  💼 {selectedJob.employmentType}
-                </span>
-              </div>
-
-              <div>
-                <strong>Experience</strong>
-                <span>
-                  🎓 {selectedJob.experience}
-                </span>
+                <p>
+                  {selectedJob.company ||
+                    "Company"}
+                </p>
               </div>
 
             </div>
 
+            {/* META */}
+            <div className="modal-meta">
+
+              <span>
+                📍{" "}
+                {selectedJob.location ||
+                  "Remote"}
+              </span>
+
+              <span>
+                💼{" "}
+                {selectedJob.employmentType ||
+                  "Not specified"}
+              </span>
+
+              <span>
+                💰{" "}
+                {formatSalary(
+                  selectedJob.salary
+                )}
+              </span>
+
+              <span>
+                🎓{" "}
+                {selectedJob.experience ||
+                  "Not specified"}
+              </span>
+
+            </div>
+
+            {/* DESCRIPTION */}
             <div className="modal-section">
 
-              <h3>Job Description</h3>
+              <h3>
+                Job Description
+              </h3>
 
               <p>
-                {selectedJob.description}
+                {selectedJob.description ||
+                  "No job description available."}
               </p>
 
             </div>
 
+            {/* SKILLS */}
             <div className="modal-section">
 
-              <h3>Required Skills</h3>
+              <h3>
+                Required Skills
+              </h3>
 
-              <div className="skills modal-skills">
+              <div className="modal-skills">
 
-                {selectedJob.skills.map(
-                  (skill) => (
+                {(selectedJob.skills || [])
+                  .map((skill) => (
                     <span
-                      className="skill-tag"
                       key={skill}
+                      className="skill-tag"
                     >
                       {skill}
                     </span>
-                  )
-                )}
+                  ))}
 
               </div>
 
             </div>
 
-            <button
-              className="modal-apply-button"
-              disabled={
-                applyingJobId ===
+            {/* ACTIONS */}
+            <div className="modal-actions">
+
+              <button
+                className={`modal-save-button ${
+                  savedJobIds.has(
+                    selectedJob._id
+                  )
+                    ? "saved"
+                    : ""
+                }`}
+                disabled={
+                  savingJobId ===
+                  selectedJob._id
+                }
+                onClick={() =>
+                  toggleSaveJob(
+                    selectedJob._id
+                  )
+                }
+              >
+                {savedJobIds.has(
+                  selectedJob._id
+                )
+                  ? "♥ Saved"
+                  : "♡ Save Job"}
+              </button>
+
+              <button
+                className="modal-apply-button"
+                disabled={
+                  applyingJobId ===
+                  selectedJob._id
+                }
+                onClick={() =>
+                  applyForJob(
+                    selectedJob._id
+                  )
+                }
+              >
+                {applyingJobId ===
                 selectedJob._id
-              }
-              onClick={() =>
-                applyForJob(selectedJob._id)
-              }
-            >
-              {applyingJobId === selectedJob._id
-                ? "Submitting Application..."
-                : "Apply Now"}
-            </button>
+                  ? "Submitting Application..."
+                  : "Apply Now"}
+              </button>
+
+            </div>
 
           </div>
 
         </div>
+
       )}
 
     </div>
   );
-}
+};
 
 export default BrowseJobs;

@@ -1,23 +1,30 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 import BrowseJobs from "./pages/BrowseJobs";
 import Applications from "./pages/Applications";
 import SavedJobs from "./pages/SavedJobs";
 import Notifications from "./pages/Notifications";
 import Profile from "./pages/Profile";
+import RecruiterDashboard from "./pages/RecruiterDashboard";
+
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 
 interface Job {
   _id: string;
   title: string;
-  company: string;
-  location: string;
-  employmentType: string;
+  company?: string;
+  location?: string;
+  employmentType?: string;
   salary?: number;
+  description?: string;
+  experience?: string;
   skills?: string[];
+  createdAt?: string;
 }
 
 interface Application {
   _id: string;
-  student: string;
   job: Job | string;
   status: string;
   coverLetter?: string;
@@ -26,773 +33,790 @@ interface Application {
 }
 
 function App() {
+  /* =========================
+     AUTH STATE
+  ========================= */
+
+  const [isAuthenticated, setIsAuthenticated] =
+    useState<boolean>(() => {
+      return !!localStorage.getItem("token");
+    });
+
+  const [authPage, setAuthPage] = useState<
+    "login" | "signup"
+  >("login");
+
+  /* =========================
+     USER ROLE
+  ========================= */
+
+  const [userRole, setUserRole] = useState<string>(() => {
+    const user = localStorage.getItem("user");
+
+    if (!user) return "";
+
+    try {
+      const parsedUser = JSON.parse(user);
+      return parsedUser.role || "";
+    } catch {
+      return "";
+    }
+  });
+
+  /* =========================
+     PAGE
+  ========================= */
+
   const [page, setPage] = useState("dashboard");
 
-  const [jobs] = useState<Job[]>([]);
-  const [applications] = useState<Application[]>([]);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  /* =========================
+     DATA
+  ========================= */
+
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [applications, setApplications] =
+    useState<Application[]>([]);
+  const [studentSkills, setStudentSkills] =
+    useState<string[]>([]);
+
+  /* =========================
+     LOAD DASHBOARD DATA
+  ========================= */
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const token = localStorage.getItem("token");
+
+    if (!token) return;
+
+    // Wait until the user's role is known.
+    if (!userRole) return;
+
+    /* ---------- JOBS ---------- */
+
+    fetch("http://localhost:5000/api/jobs")
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success) {
+          setJobs(result.data || []);
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching jobs:", error);
+      });
+
+    /* ---------- STUDENT APPLICATIONS ---------- */
+
+    if (userRole === "student") {
+      fetch("http://localhost:5000/api/applications", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.success) {
+            setApplications(result.data || []);
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "Error fetching applications:",
+            error
+          );
+        });
+    }
+
+    /* ---------- STUDENT PROFILE ---------- */
+
+    if (userRole === "student") {
+      fetch(
+        "http://localhost:5000/api/student/profile",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.success) {
+            setStudentSkills(
+              result.data?.skills || []
+            );
+          }
+        })
+        .catch((error) => {
+          console.error(
+            "Error fetching profile:",
+            error
+          );
+        });
+    }
+  }, [isAuthenticated, userRole]);
+
+  /* =========================
+     APPLICATION STATS
+  ========================= */
 
   const totalApplications = applications.length;
 
-  const pendingApplications = applications.filter(
-    (application) =>
-      application.status.toLowerCase() === "pending"
-  ).length;
+  const pendingApplications =
+    applications.filter(
+      (application) =>
+        application.status?.toLowerCase() === "pending"
+    ).length;
 
-  const shortlistedApplications = applications.filter(
-    (application) =>
-      application.status.toLowerCase() === "shortlisted"
-  ).length;
+  const shortlistedApplications =
+    applications.filter(
+      (application) =>
+        application.status?.toLowerCase() ===
+        "shortlisted"
+    ).length;
 
-  const hiredApplications = applications.filter(
-    (application) =>
-      application.status.toLowerCase() === "hired"
-  ).length;
+  const hiredApplications =
+    applications.filter(
+      (application) =>
+        application.status?.toLowerCase() === "hired"
+    ).length;
 
-  const getApplicationJob = (
-    application: Application
-  ): Job | null => {
+  /* =========================
+     AI MATCH HELPER
+
+     NOTE:
+     This only keeps your existing
+     dashboard matching display.
+     No new AI functionality added.
+  ========================= */
+
+  const getJobMatch = (job: Job) => {
     if (
-      typeof application.job === "object" &&
-      application.job !== null
+      !studentSkills.length ||
+      !job.skills ||
+      !job.skills.length
     ) {
-      return application.job;
+      return 0;
     }
 
-    const jobId = application.job;
+    const matchedSkills = job.skills.filter(
+      (skill) =>
+        studentSkills.some(
+          (studentSkill) =>
+            studentSkill.toLowerCase() ===
+            skill.toLowerCase()
+        )
+    );
 
-    return (
-      jobs.find((job) => job._id === jobId) || null
+    return Math.round(
+      (matchedSkills.length / job.skills.length) * 100
     );
   };
 
-  const navigate = (newPage: string) => {
-    setPage(newPage);
-  };
+  const rankedJobs = [...jobs]
+    .map((job) => ({
+      ...job,
+      matchScore: getJobMatch(job),
+    }))
+    .sort(
+      (a, b) =>
+        (b.matchScore || 0) -
+        (a.matchScore || 0)
+    );
+
+  /* =========================
+     AUTHENTICATION
+  ========================= */
+
+  if (!isAuthenticated) {
+    if (authPage === "signup") {
+      return (
+        <Signup
+          onLogin={() => setAuthPage("login")}
+        />
+      );
+    }
+
+    return (
+      <Login
+        onSignup={() => setAuthPage("signup")}
+        onLoginSuccess={() => {
+          const user =
+            localStorage.getItem("user");
+
+          if (user) {
+            try {
+              const parsedUser =
+                JSON.parse(user);
+
+              setUserRole(
+                parsedUser.role || ""
+              );
+            } catch {
+              setUserRole("");
+            }
+          }
+
+          setIsAuthenticated(true);
+          setPage("dashboard");
+        }}
+      />
+    );
+  }
+
+  /* =========================
+     LOGGED-IN APPLICATION
+  ========================= */
 
   return (
-    <div className="dashboard">
+    <div className="app">
 
-      {/* ================= SIDEBAR ================= */}
+      {/* =========================
+          SIDEBAR
+      ========================= */}
 
-      <aside
-        className="sidebar"
-        style={{
-          zIndex: 1000,
-          pointerEvents: "auto",
-        }}
-      >
+      <aside className="sidebar">
 
-        <div className="logo">
-          SkillHire <span>AI</span>
+        <div className="sidebar-logo">
+          <div className="brand-logo">
+            S
+          </div>
+
+          <span>
+            SkillHire AI
+          </span>
         </div>
 
-        <p className="nav-title">MENU</p>
+        <nav className="sidebar-nav">
 
-        {/* Dashboard */}
-        <div
-          className={`nav-item ${
-            page === "dashboard" ? "active" : ""
-          }`}
-          onClick={() => navigate("dashboard")}
-          role="button"
-          tabIndex={0}
-        >
-          ▣ Dashboard
-        </div>
+          {/* DASHBOARD */}
 
-        {/* Browse Jobs */}
-        <div
-          className={`nav-item ${
-            page === "jobs" ? "active" : ""
-          }`}
-          onClick={() => navigate("jobs")}
-          role="button"
-          tabIndex={0}
-        >
-          ⌕ Browse Jobs
-        </div>
+          <button
+            className={
+              page === "dashboard"
+                ? "nav-item active"
+                : "nav-item"
+            }
+            onClick={() =>
+              setPage("dashboard")
+            }
+          >
+            <span>⌂</span>
+            Dashboard
+          </button>
 
-        {/* Applications */}
-        <div
-          className={`nav-item ${
-            page === "applications" ? "active" : ""
-          }`}
-          onClick={() => navigate("applications")}
-          role="button"
-          tabIndex={0}
-        >
-          ▤ Applications
-        </div>
+          {/* =========================
+              STUDENT NAVIGATION
+          ========================= */}
 
-        {/* Saved Jobs */}
-        <div
-          className={`nav-item ${
-            page === "saved" ? "active" : ""
-          }`}
-          onClick={() => navigate("saved")}
-          role="button"
-          tabIndex={0}
-        >
-          ♡ Saved Jobs
-        </div>
+          {userRole === "student" && (
+            <>
+              <button
+                className={
+                  page === "jobs"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("jobs")
+                }
+              >
+                <span>💼</span>
+                Browse Jobs
+              </button>
 
-        {/* Notifications */}
-        <div
-          className={`nav-item ${
-            page === "notifications" ? "active" : ""
-          }`}
-          onClick={() => navigate("notifications")}
-          role="button"
-          tabIndex={0}
-        >
-          🔔 Notifications
-        </div>
+              <button
+                className={
+                  page === "applications"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("applications")
+                }
+              >
+                <span>📄</span>
+                Applications
+              </button>
 
-        {/* Profile */}
-        <div
-          className={`nav-item ${
-            page === "profile" ? "active" : ""
-          }`}
-          onClick={() => navigate("profile")}
-          role="button"
-          tabIndex={0}
-        >
-          ◉ Profile
-        </div>
+              <button
+                className={
+                  page === "saved"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("saved")
+                }
+              >
+                <span>🔖</span>
+                Saved Jobs
+              </button>
 
-        {/* Logout */}
-        <div
-          className="nav-item logout"
-          onClick={() => {
-            localStorage.removeItem("token");
-            window.location.reload();
-          }}
-          role="button"
-          tabIndex={0}
-        >
-          ↪ Logout
+              <button
+                className={
+                  page === "notifications"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("notifications")
+                }
+              >
+                <span>🔔</span>
+                Notifications
+              </button>
+
+              <button
+                className={
+                  page === "profile"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("profile")
+                }
+              >
+                <span>👤</span>
+                Profile
+              </button>
+            </>
+          )}
+
+          {/* =========================
+              RECRUITER NAVIGATION
+          ========================= */}
+
+          {userRole === "recruiter" && (
+            <>
+              <button
+                className={
+                  page === "jobs"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("jobs")
+                }
+              >
+                <span>💼</span>
+                My Jobs
+              </button>
+
+              <button
+                className={
+                  page === "profile"
+                    ? "nav-item active"
+                    : "nav-item"
+                }
+                onClick={() =>
+                  setPage("profile")
+                }
+              >
+                <span>👤</span>
+                Profile
+              </button>
+            </>
+          )}
+
+        </nav>
+
+        {/* ---------- LOGOUT ---------- */}
+
+        <div className="sidebar-bottom">
+
+          <button
+            className="nav-item logout"
+            onClick={() => {
+              localStorage.removeItem("token");
+              localStorage.removeItem("user");
+
+              setIsAuthenticated(false);
+              setUserRole("");
+              setAuthPage("login");
+              setPage("dashboard");
+              setApplications([]);
+              setStudentSkills([]);
+            }}
+          >
+            <span>↪</span>
+            Logout
+          </button>
+
         </div>
 
       </aside>
 
-      {/* ================= MAIN ================= */}
+      {/* =========================
+          MAIN CONTENT
+      ========================= */}
 
-      <main className="main">
+      <main className="main-content">
 
-        {/* ================= BROWSE JOBS ================= */}
+        {/* =========================
+            RECRUITER DASHBOARD
+        ========================= */}
 
-        {page === "jobs" ? (
+        {page === "dashboard" &&
+          userRole === "recruiter" && (
+            <RecruiterDashboard />
+          )}
 
-          <BrowseJobs />
+        {/* =========================
+            STUDENT DASHBOARD
+        ========================= */}
 
-        ) : page === "applications" ? (
+        {page === "dashboard" &&
+          userRole === "student" && (
+            <div className="dashboard">
 
-          /* ================= APPLICATIONS ================= */
+              {/* ---------- HEADER ---------- */}
 
-          <Applications />
+              <div className="dashboard-header">
 
-        ) : page === "saved" ? (
+                <div>
+                  <p className="dashboard-label">
+                    STUDENT DASHBOARD
+                  </p>
 
-          /* ================= SAVED JOBS ================= */
+                  <h1>
+                    Welcome back, Vanshika! 👋
+                  </h1>
 
-          <SavedJobs />
-
-        ) : page === "notifications" ? (
-
-          /* ================= NOTIFICATIONS ================= */
-
-          <Notifications />
-
-        ) : page === "profile" ? <Profile /> : (
-
-          /* ================= DASHBOARD ================= */
-
-          <>
-
-            {/* ================= HEADER ================= */}
-
-            <header className="header">
-
-              <div>
-
-                <h1>
-                  Welcome back, Vanshika! 👋
-                </h1>
-
-                <p>
-                  Here's what's happening with your
-                  job search today.
-                </p>
-
-              </div>
-
-              <div className="header-right">
-
-                <div
-                  className="notification"
-                  onClick={() => navigate("notifications")}
-                  style={{
-                    cursor: "pointer",
-                    position: "relative",
-                    zIndex: 10,
-                  }}
-                >
-                  🔔
-                </div>
-
-                <div className="avatar">
-                  V
+                  <p>
+                    Here's what's happening with
+                    your job search.
+                  </p>
                 </div>
 
               </div>
 
-            </header>
+              {/* ---------- STATS ---------- */}
 
-            {/* ================= ERROR ================= */}
+              <div className="stats-grid">
 
-            {error && (
-              <div
-                style={{
-                  background: "#fee2e2",
-                  color: "#b91c1c",
-                  padding: "12px 16px",
-                  borderRadius: "8px",
-                  marginBottom: "20px",
-                }}
-              >
-                {error}
-              </div>
-            )}
+                <div className="stat-card">
 
-            {/* ================= LOADING ================= */}
-
-            {loading ? (
-
-              <div className="card">
-
-                <h2>
-                  Loading dashboard...
-                </h2>
-
-                <p>
-                  Please wait.
-                </p>
-
-              </div>
-
-            ) : (
-
-              <>
-
-                {/* ================= STATS ================= */}
-
-                <section className="stats">
-
-                  {/* Applied */}
-
-                  <div className="card">
-
-                    <div className="stat-label">
-                      Applied
-                    </div>
-
-                    <div className="stat-value">
-                      {totalApplications}
-                    </div>
-
-                    <div className="stat-change">
-                      Your total applications
-                    </div>
-
+                  <div className="stat-icon">
+                    📄
                   </div>
 
-                  {/* Pending */}
-
-                  <div className="card">
-
-                    <div className="stat-label">
-                      Pending
-                    </div>
-
-                    <div className="stat-value">
-                      {pendingApplications}
-                    </div>
-
-                    <div className="stat-change">
-                      Applications under review
-                    </div>
-
-                  </div>
-
-                  {/* Shortlisted */}
-
-                  <div className="card">
-
-                    <div className="stat-label">
-                      Shortlisted
-                    </div>
-
-                    <div className="stat-value">
-                      {shortlistedApplications}
-                    </div>
-
-                    <div className="stat-change">
-                      Great progress!
-                    </div>
-
-                  </div>
-
-                  {/* Hired */}
-
-                  <div className="card">
-
-                    <div className="stat-label">
-                      Hired
-                    </div>
-
-                    <div className="stat-value">
-                      {hiredApplications}
-                    </div>
-
-                    <div className="stat-change">
-                      Congratulations 🎉
-                    </div>
-
-                  </div>
-
-                </section>
-
-                {/* ================= CONTENT ================= */}
-
-                <section className="content-grid">
-
-                  {/* ================= RECOMMENDED JOBS ================= */}
-
-                  <div className="card">
-
-                    <div className="section-header">
-
-                      <h2>
-                        Recommended Jobs
-                      </h2>
-
-                      <span
-                        className="view-all"
-                        onClick={() => navigate("jobs")}
-                        style={{
-                          cursor: "pointer",
-                        }}
-                      >
-                        View All →
-                      </span>
-
-                    </div>
-
-                    {jobs.length === 0 ? (
-
-                      <p>
-                        No jobs available right now.
-                      </p>
-
-                    ) : (
-
-                      jobs
-                        .slice(0, 3)
-                        .map((job) => (
-
-                          <div
-                            className="job"
-                            key={job._id}
-                          >
-
-                            <div className="job-top">
-
-                              <div className="job-info">
-
-                                <div className="company-logo">
-
-                                  {job.company
-                                    ? job.company
-                                        .charAt(0)
-                                        .toUpperCase()
-                                    : "J"}
-
-                                </div>
-
-                                <div>
-
-                                  <h3>
-                                    {job.title}
-                                  </h3>
-
-                                  <div className="company">
-                                    {job.company}
-                                  </div>
-
-                                </div>
-
-                              </div>
-
-                              <div className="match">
-                                AI Match
-                              </div>
-
-                            </div>
-
-                            <div className="job-details">
-
-                              <span>
-                                📍 {job.location}
-                              </span>
-
-                              <span>
-                                💼 {job.employmentType}
-                              </span>
-
-                              <span>
-                                ₹
-                                {job.salary?.toLocaleString()}
-                              </span>
-
-                            </div>
-
-                            <div
-                              style={{
-                                marginTop: "10px",
-                                display: "flex",
-                                gap: "6px",
-                                flexWrap: "wrap",
-                              }}
-                            >
-
-                              {job.skills
-                                ?.slice(0, 4)
-                                .map((skill) => (
-
-                                  <span
-                                    key={skill}
-                                    style={{
-                                      background:
-                                        "#eef2ff",
-                                      color:
-                                        "#4f46e5",
-                                      padding:
-                                        "4px 8px",
-                                      borderRadius:
-                                        "5px",
-                                      fontSize:
-                                        "11px",
-                                    }}
-                                  >
-                                    {skill}
-                                  </span>
-
-                                ))}
-
-                            </div>
-
-                            <button
-                              className="apply-btn"
-                              onClick={() =>
-                                navigate("jobs")
-                              }
-                            >
-                              View Job
-                            </button>
-
-                          </div>
-
-                        ))
-
-                    )}
-
-                  </div>
-
-                  {/* ================= RECENT APPLICATIONS ================= */}
-
-                  <div className="card">
-
-                    <div className="section-header">
-
-                      <h2>
-                        Recent Applications
-                      </h2>
-
-                      <span
-                        className="view-all"
-                        onClick={() =>
-                          navigate("applications")
-                        }
-                        style={{
-                          cursor: "pointer",
-                        }}
-                      >
-                        View All →
-                      </span>
-
-                    </div>
-
-                    {applications.length === 0 ? (
-
-                      <p>
-                        You haven't applied to any
-                        jobs yet.
-                      </p>
-
-                    ) : (
-
-                      applications
-                        .slice(0, 5)
-                        .map((application) => {
-
-                          const job =
-                            getApplicationJob(
-                              application
-                            );
-
-                          return (
-
-                            <div
-                              className="application"
-                              key={application._id}
-                            >
-
-                              <div className="application-top">
-
-                                <div>
-
-                                  <h3>
-                                    {job
-                                      ? job.title
-                                      : "Job Application"}
-                                  </h3>
-
-                                  <p>
-                                    {job
-                                      ? job.company
-                                      : "SkillHire AI"}
-                                  </p>
-
-                                </div>
-
-                                <span
-                                  className={`badge ${
-                                    application.status.toLowerCase()
-                                  }`}
-                                >
-                                  {application.status}
-                                </span>
-
-                              </div>
-
-                              <small>
-                                Applied{" "}
-                                {new Date(
-                                  application.createdAt
-                                ).toLocaleDateString()}
-                              </small>
-
-                            </div>
-
-                          );
-
-                        })
-
-                    )}
-
-                  </div>
-
-                </section>
-
-                {/* ================= AI RECOMMENDATIONS ================= */}
-
-                <section
-                  style={{
-                    marginTop: "25px",
-                  }}
-                >
-
-                  <div className="section-header">
-
-                    <h2>
-                      ✨ AI-Powered Recommendations
-                    </h2>
-
-                    <span
-                      style={{
-                        color: "#7b8496",
-                        fontSize: "13px",
-                      }}
-                    >
-                      Based on your profile
+                  <div>
+                    <span>
+                      Applications
                     </span>
 
+                    <strong>
+                      {totalApplications}
+                    </strong>
                   </div>
 
-                  {jobs
-                    .slice(0, 3)
-                    .map((job, index) => {
+                </div>
 
-                      const matchScores = [
-                        95,
-                        88,
-                        82,
-                      ];
+                <div className="stat-card">
 
-                      return (
+                  <div className="stat-icon">
+                    ⏳
+                  </div>
 
-                        <div
-                          className="card"
-                          key={`recommendation-${job._id}`}
-                          style={{
-                            marginBottom: "12px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent:
-                              "space-between",
-                          }}
-                        >
+                  <div>
+                    <span>
+                      Pending
+                    </span>
 
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "18px",
-                            }}
-                          >
+                    <strong>
+                      {pendingApplications}
+                    </strong>
+                  </div>
 
+                </div>
+
+                <div className="stat-card">
+
+                  <div className="stat-icon">
+                    ✓
+                  </div>
+
+                  <div>
+                    <span>
+                      Shortlisted
+                    </span>
+
+                    <strong>
+                      {shortlistedApplications}
+                    </strong>
+                  </div>
+
+                </div>
+
+                <div className="stat-card">
+
+                  <div className="stat-icon">
+                    🎉
+                  </div>
+
+                  <div>
+                    <span>
+                      Hired
+                    </span>
+
+                    <strong>
+                      {hiredApplications}
+                    </strong>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* ---------- RECENT APPLICATIONS ---------- */}
+
+              <section className="dashboard-section">
+
+                <div className="section-header">
+
+                  <div>
+                    <h2>
+                      Recent Applications
+                    </h2>
+
+                    <p>
+                      Track the status of your
+                      latest applications.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setPage("applications")
+                    }
+                  >
+                    View All →
+                  </button>
+
+                </div>
+
+                <div className="applications-preview">
+
+                  {applications.length === 0 ? (
+                    <div className="empty-state">
+
+                      <h3>
+                        No applications yet
+                      </h3>
+
+                      <p>
+                        Start applying to jobs
+                        that match your skills.
+                      </p>
+
+                      <button
+                        onClick={() =>
+                          setPage("jobs")
+                        }
+                      >
+                        Browse Jobs
+                      </button>
+
+                    </div>
+                  ) : (
+                    applications
+                      .slice(0, 3)
+                      .map(
+                        (application) => {
+
+                          const job =
+                            typeof application.job ===
+                            "object"
+                              ? application.job
+                              : null;
+
+                          return (
                             <div
-                              style={{
-                                width: "55px",
-                                height: "55px",
-                                borderRadius:
-                                  "50%",
-                                background:
-                                  "#eef2ff",
-                                color:
-                                  "#6366f1",
-                                display: "flex",
-                                alignItems:
-                                  "center",
-                                justifyContent:
-                                  "center",
-                                fontWeight:
-                                  "700",
-                              }}
+                              className="application-row"
+                              key={
+                                application._id
+                              }
                             >
-                              {matchScores[index]}%
-                            </div>
 
-                            <div>
+                              <div className="application-company">
 
-                              <h3
-                                style={{
-                                  margin: 0,
-                                  fontSize:
-                                    "15px",
-                                }}
-                              >
-                                {job.title}
-                              </h3>
+                                <div className="company-avatar">
+                                  {job?.company
+                                    ?.charAt(0)
+                                    .toUpperCase() ||
+                                    "S"}
+                                </div>
 
-                              <p
-                                style={{
-                                  margin:
-                                    "5px 0",
-                                  color:
-                                    "#7b8496",
-                                  fontSize:
-                                    "12px",
-                                }}
-                              >
-                                {job.company}
-                              </p>
+                                <div>
+                                  <strong>
+                                    {job?.title ||
+                                      "Job"}
+                                  </strong>
 
-                              <div
-                                style={{
-                                  display:
-                                    "flex",
-                                  gap: "6px",
-                                  flexWrap:
-                                    "wrap",
-                                }}
-                              >
-
-                                {job.skills
-                                  ?.slice(0, 4)
-                                  .map(
-                                    (skill) => (
-
-                                      <span
-                                        key={
-                                          skill
-                                        }
-                                        style={{
-                                          fontSize:
-                                            "10px",
-                                          background:
-                                            "#f0f2ff",
-                                          color:
-                                            "#6366f1",
-                                          padding:
-                                            "4px 7px",
-                                          borderRadius:
-                                            "4px",
-                                        }}
-                                      >
-                                        {skill}
-                                      </span>
-
-                                    )
-                                  )}
+                                  <span>
+                                    {job?.company ||
+                                      "Company"}
+                                  </span>
+                                </div>
 
                               </div>
 
-                            </div>
+                              <div>
+                                <span>
+                                  {job?.location ||
+                                    "Remote"}
+                                </span>
+                              </div>
 
+                              <div
+                                className={`application-status ${
+                                  application.status
+                                    ?.toLowerCase()
+                                }`}
+                              >
+                                {
+                                  application.status
+                                }
+                              </div>
+
+                            </div>
+                          );
+                        }
+                      )
+                  )}
+
+                </div>
+
+              </section>
+
+              {/* ---------- RECOMMENDED JOBS ---------- */}
+
+              <section className="dashboard-section">
+
+                <div className="section-header">
+
+                  <div>
+                    <h2>
+                      Recommended Jobs
+                    </h2>
+
+                    <p>
+                      Opportunities you may be
+                      interested in.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() =>
+                      setPage("jobs")
+                    }
+                  >
+                    Browse All →
+                  </button>
+
+                </div>
+
+                <div className="job-preview-grid">
+
+                  {rankedJobs
+                    .slice(0, 3)
+                    .map((job) => (
+
+                      <div
+                        className="dashboard-job-card"
+                        key={job._id}
+                      >
+
+                        <div className="job-card-top">
+
+                          <div className="company-avatar">
+                            {job.company
+                              ?.charAt(0)
+                              .toUpperCase() ||
+                              "S"}
                           </div>
 
-                          <button
-                            style={{
-                              border:
-                                "1px solid #6366f1",
-                              background:
-                                "white",
-                              color:
-                                "#6366f1",
-                              padding:
-                                "10px 18px",
-                              borderRadius:
-                                "8px",
-                              cursor:
-                                "pointer",
-                              fontWeight:
-                                "600",
-                            }}
-                            onClick={() =>
-                              navigate("jobs")
-                            }
-                          >
-                            View Details →
-                          </button>
+                          <span className="match-badge">
+                            {job.matchScore || 0}%
+                            Match
+                          </span>
 
                         </div>
 
-                      );
+                        <h3>
+                          {job.title}
+                        </h3>
 
-                    })}
+                        <p>
+                          {job.company ||
+                            "Company"}
+                        </p>
 
-                </section>
+                        <div className="job-meta">
 
-              </>
+                          <span>
+                            📍{" "}
+                            {job.location ||
+                              "Remote"}
+                          </span>
 
-            )}
+                          <span>
+                            💼{" "}
+                            {job.employmentType ||
+                              "Full-Time"}
+                          </span>
 
-          </>
+                        </div>
 
+                      </div>
+
+                    ))}
+
+                </div>
+
+              </section>
+
+            </div>
+          )}
+
+        {/* =========================
+            STUDENT PAGES
+        ========================= */}
+
+        {page === "jobs" &&
+          userRole === "student" && (
+            <BrowseJobs />
+          )}
+
+        {page === "applications" &&
+          userRole === "student" && (
+            <Applications />
+          )}
+
+        {page === "saved" &&
+          userRole === "student" && (
+            <SavedJobs />
+          )}
+
+        {page === "notifications" &&
+          userRole === "student" && (
+            <Notifications  onNavigate={(newPage) =>
+            setPage(newPage)} />
+          )}
+
+        {page === "profile" && (
+          <Profile />
         )}
+
+        {/* =========================
+            RECRUITER JOBS
+        ========================= */}
+
+        {page === "jobs" &&
+          userRole === "recruiter" && (
+            <RecruiterDashboard />
+          )}
 
       </main>
 

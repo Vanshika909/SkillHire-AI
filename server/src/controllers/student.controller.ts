@@ -3,7 +3,47 @@ import {
   getProfile,
   updateProfile,
 } from "../services/student.service";
+import { uploadAvatar } from "../middleware/upload.middleware";
 
+
+
+
+export const uploadProfilePicture = async (
+  req: any,
+  res: Response
+) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload a profile picture",
+      });
+    }
+
+    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+
+    const user = await updateProfile(
+      req.user._id,
+      {
+        avatar: avatarUrl,
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Profile picture uploaded successfully",
+      data: user,
+      avatarUrl,
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to upload profile picture",
+    });
+  }
+};
 // Get logged-in student's profile
 export const profile = async (req: any, res: Response) => {
   try {

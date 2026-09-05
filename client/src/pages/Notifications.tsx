@@ -8,19 +8,32 @@ interface Notification {
   createdAt: string;
 }
 
-function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeFilter, setActiveFilter] = useState("All");
+interface NotificationsProps {
+  onNavigate?: (page: string) => void;
+}
+
+function Notifications({
+  onNavigate,
+}: NotificationsProps) {
+  const [notifications, setNotifications] = useState<
+    Notification[]
+  >([]);
+
+  const [activeFilter, setActiveFilter] =
+    useState("All");
+
   const [loading, setLoading] = useState(true);
 
   const token = localStorage.getItem("token");
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  // ==========================================
+  // FETCH NOTIFICATIONS
+  // ==========================================
 
   const fetchNotifications = async () => {
     try {
+      setLoading(true);
+
       const response = await fetch(
         "http://localhost:5000/api/notifications/",
         {
@@ -36,28 +49,44 @@ function Notifications() {
         setNotifications(data.data || []);
       }
     } catch (error) {
-      console.error("Failed to fetch notifications:", error);
+      console.error(
+        "Failed to fetch notifications:",
+        error
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  // ==========================================
+  // MARK ALL AS READ
+  // ==========================================
+
   const markAllAsRead = async () => {
     try {
+      const unreadNotifications =
+        notifications.filter(
+          (notification) =>
+            !notification.isRead &&
+            !notification._id.startsWith("demo-")
+        );
+
       await Promise.all(
-        notifications
-          .filter((notification) => !notification.isRead)
-          .map((notification) =>
-            fetch(
-              `http://localhost:5000/api/notifications/${notification._id}/read`,
-              {
-                method: "PUT",
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              }
-            )
+        unreadNotifications.map((notification) =>
+          fetch(
+            `http://localhost:5000/api/notifications/${notification._id}/read`,
+            {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
           )
+        )
       );
 
       setNotifications((previous) =>
@@ -67,22 +96,115 @@ function Notifications() {
         }))
       );
     } catch (error) {
-      console.error("Failed to mark notifications as read:", error);
+      console.error(
+        "Failed to mark notifications as read:",
+        error
+      );
     }
   };
+
+  // ==========================================
+  // MARK ONE AS READ
+  // ==========================================
+
+  const markAsRead = async (
+    notification: Notification
+  ) => {
+    // Demo notifications do not exist in database
+    if (
+      notification._id.startsWith("demo-") ||
+      notification.isRead
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/notifications/${notification._id}/read`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Unable to mark notification as read"
+        );
+      }
+
+      setNotifications((previous) =>
+        previous.map((item) =>
+          item._id === notification._id
+            ? {
+                ...item,
+                isRead: true,
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Failed to mark notification as read:",
+        error
+      );
+    }
+  };
+
+  // ==========================================
+  // HANDLE NOTIFICATION CLICK
+  // ==========================================
+
+  const handleNotificationClick = async (
+    notification: Notification
+  ) => {
+    await markAsRead(notification);
+
+    const category = getCategory(notification);
+
+    // Application notification
+    if (category === "Applications") {
+      onNavigate?.("applications");
+      return;
+    }
+
+    // Job notification
+    if (category === "Jobs") {
+      onNavigate?.("jobs");
+      return;
+    }
+  };
+
+  // ==========================================
+  // UNREAD COUNT
+  // ==========================================
 
   const unreadCount = notifications.filter(
     (notification) => !notification.isRead
   ).length;
 
-  const getNotificationTitle = (notification: Notification) => {
-    if (notification.message.toLowerCase().includes("shortlisted")) {
+  // ==========================================
+  // TITLE
+  // ==========================================
+
+  const getNotificationTitle = (
+    notification: Notification
+  ) => {
+    const message =
+      notification.message.toLowerCase();
+
+    if (
+      message.includes("shortlisted") ||
+      message.includes("hired") ||
+      message.includes("rejected") ||
+      message.includes("updated")
+    ) {
       return "Application Status Updated";
     }
 
-    if (
-      notification.message.toLowerCase().includes("submitted")
-    ) {
+    if (message.includes("submitted")) {
       return "Application Submitted";
     }
 
@@ -95,14 +217,20 @@ function Notifications() {
     return "Welcome to SkillHire AI";
   };
 
-  const getNotificationIcon = (notification: Notification) => {
-    const title = getNotificationTitle(notification);
+  // ==========================================
+  // ICON
+  // ==========================================
 
-    if (title === "Application Status Updated") {
-      return "▤";
-    }
+  const getNotificationIcon = (
+    notification: Notification
+  ) => {
+    const title =
+      getNotificationTitle(notification);
 
-    if (title === "Application Submitted") {
+    if (
+      title === "Application Status Updated" ||
+      title === "Application Submitted"
+    ) {
       return "▤";
     }
 
@@ -113,10 +241,15 @@ function Notifications() {
     return "•";
   };
 
+  // ==========================================
+  // ICON CLASS
+  // ==========================================
+
   const getNotificationClass = (
     notification: Notification
   ) => {
-    const title = getNotificationTitle(notification);
+    const title =
+      getNotificationTitle(notification);
 
     if (
       title === "Application Status Updated" ||
@@ -132,8 +265,15 @@ function Notifications() {
     return "notification-icon system-icon";
   };
 
-  const getCategory = (notification: Notification) => {
-    const title = getNotificationTitle(notification);
+  // ==========================================
+  // CATEGORY
+  // ==========================================
+
+  const getCategory = (
+    notification: Notification
+  ) => {
+    const title =
+      getNotificationTitle(notification);
 
     if (
       title === "Application Status Updated" ||
@@ -149,12 +289,18 @@ function Notifications() {
     return "System";
   };
 
+  // ==========================================
+  // DATE
+  // ==========================================
+
   const formatDate = (date: string) => {
     const notificationDate = new Date(date);
+
     const now = new Date();
 
     const difference =
-      now.getTime() - notificationDate.getTime();
+      now.getTime() -
+      notificationDate.getTime();
 
     const minutes = Math.floor(
       difference / (1000 * 60)
@@ -165,7 +311,10 @@ function Notifications() {
     const days = Math.floor(hours / 24);
 
     if (minutes < 60) {
-      return `${Math.max(minutes, 1)} min ago`;
+      return `${Math.max(
+        minutes,
+        1
+      )} min ago`;
     }
 
     if (hours < 24) {
@@ -185,23 +334,28 @@ function Notifications() {
     );
   };
 
+  // ==========================================
+  // FILTER
+  // ==========================================
+
   const filteredNotifications =
     activeFilter === "All"
       ? notifications
       : activeFilter === "Unread"
       ? notifications.filter(
-          (notification) => !notification.isRead
+          (notification) =>
+            !notification.isRead
         )
       : notifications.filter(
           (notification) =>
-            getCategory(notification) === activeFilter
+            getCategory(notification) ===
+            activeFilter
         );
 
-  /*
-   * Demo notifications are shown only when backend has
-   * fewer notifications, so the page visually matches
-   * the design while real backend notifications remain.
-   */
+  // ==========================================
+  // DEMO NOTIFICATIONS
+  // ==========================================
+
   const demoNotifications: Notification[] = [
     {
       _id: "demo-job",
@@ -210,7 +364,8 @@ function Notifications() {
       type: "Job",
       isRead: false,
       createdAt: new Date(
-        Date.now() - 24 * 60 * 60 * 1000
+        Date.now() -
+          24 * 60 * 60 * 1000
       ).toISOString(),
     },
     {
@@ -220,7 +375,8 @@ function Notifications() {
       type: "Application",
       isRead: true,
       createdAt: new Date(
-        Date.now() - 2 * 24 * 60 * 60 * 1000
+        Date.now() -
+          2 * 24 * 60 * 60 * 1000
       ).toISOString(),
     },
     {
@@ -230,7 +386,8 @@ function Notifications() {
       type: "System",
       isRead: true,
       createdAt: new Date(
-        Date.now() - 3 * 24 * 60 * 60 * 1000
+        Date.now() -
+          3 * 24 * 60 * 60 * 1000
       ).toISOString(),
     },
   ];
@@ -253,14 +410,19 @@ function Notifications() {
           <h1>Notifications</h1>
 
           <p>
-            Stay updated with your applications and job
-            opportunities.
+            Stay updated with your applications and
+            job opportunities.
           </p>
         </div>
 
         <div className="unread-card">
-          <strong>{unreadCount}</strong>
-          <span>Unread</span>
+          <strong>
+            {unreadCount}
+          </strong>
+
+          <span>
+            Unread
+          </span>
         </div>
 
       </div>
@@ -277,7 +439,6 @@ function Notifications() {
             "Applications",
             "Jobs",
           ].map((filter) => (
-
             <button
               key={filter}
               className={
@@ -291,7 +452,6 @@ function Notifications() {
             >
               {filter}
             </button>
-
           ))}
 
         </div>
@@ -305,14 +465,16 @@ function Notifications() {
 
       </div>
 
-      {/* ================= NOTIFICATION CARD ================= */}
+      {/* ================= NOTIFICATIONS CARD ================= */}
 
       <div className="notifications-card">
 
         <div className="notifications-card-header">
 
           <div>
-            <h2>Recent Notifications</h2>
+            <h2>
+              Recent Notifications
+            </h2>
 
             <p>
               Your latest SkillHire AI updates.
@@ -320,7 +482,7 @@ function Notifications() {
           </div>
 
           <span className="notification-count">
-            {notifications.length || 4} notifications
+            {notifications.length} notifications
           </span>
 
         </div>
@@ -328,27 +490,28 @@ function Notifications() {
         {/* ================= LOADING ================= */}
 
         {loading ? (
-
           <div className="notifications-loading">
             Loading notifications...
           </div>
-
         ) : displayNotifications.length === 0 ? (
-
           <div className="notifications-empty">
+
             <div>🔔</div>
-            <h3>No notifications</h3>
+
+            <h3>
+              No notifications
+            </h3>
+
             <p>
               You're all caught up!
             </p>
+
           </div>
-
         ) : (
-
           <div className="notification-list">
 
             {displayNotifications.map(
-              (notification, index) => {
+              (notification) => {
 
                 const title =
                   getNotificationTitle(
@@ -369,14 +532,30 @@ function Notifications() {
                   );
 
                 return (
-
                   <div
-                    key={`${notification._id}-${index}`}
+                    key={notification._id}
                     className={
                       notification.isRead
                         ? "notification-row"
                         : "notification-row unread"
                     }
+                    onClick={() =>
+                      handleNotificationClick(
+                        notification
+                      )
+                    }
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        handleNotificationClick(
+                          notification
+                        );
+                      }
+                    }}
                   >
 
                     {/* ICON */}
@@ -432,18 +611,19 @@ function Notifications() {
                     <button
                       className="notification-menu"
                       title="More options"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
                     >
                       ⋮
                     </button>
 
                   </div>
-
                 );
               }
             )}
 
           </div>
-
         )}
 
       </div>

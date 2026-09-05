@@ -1,15 +1,31 @@
-import { Router } from "express";
-import { profile, update } from "../controllers/student.controller";
-import { protect, authorize } from "../middleware/auth.middleware";
-import { uploadResume } from "../middleware/upload.middleware";
-import { Response } from "express";
+import { Router, Response } from "express";
+
 import {
-  getProfile,
+  profile,
+  update,
+  uploadProfilePicture,
+} from "../controllers/student.controller";
+
+import {
+  protect,
+  authorize,
+} from "../middleware/auth.middleware";
+
+import {
+  uploadResume,
+  uploadAvatar,
+} from "../middleware/upload.middleware";
+
+import {
   updateProfile,
 } from "../services/student.service";
+
 const router = Router();
 
-// Get logged-in student's profile
+// ==========================================
+// GET PROFILE
+// ==========================================
+
 router.get(
   "/profile",
   protect,
@@ -17,13 +33,33 @@ router.get(
   profile
 );
 
-// Update logged-in student's profile
+// ==========================================
+// UPDATE PROFILE
+// ==========================================
+
 router.put(
   "/profile",
   protect,
   authorize("student"),
   update
 );
+
+// ==========================================
+// UPLOAD PROFILE PICTURE
+// ==========================================
+
+router.post(
+  "/profile/avatar",
+  protect,
+  authorize("student"),
+  uploadAvatar.single("avatar"),
+  uploadProfilePicture
+);
+
+// ==========================================
+// UPLOAD RESUME
+// ==========================================
+
 router.post(
   "/profile/resume",
   protect,
@@ -38,20 +74,24 @@ router.post(
         });
       }
 
-      const resumeUrl = `/uploads/resumes/${req.file.filename}`;
+      const resumeUrl =
+        `/uploads/resumes/${req.file.filename}`;
 
-      const user = await updateProfile(req.user._id, {
-        resume: resumeUrl,
-      });
+      const user = await updateProfile(
+        req.user._id,
+        {
+          resume: resumeUrl,
+        }
+      );
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         message: "Resume uploaded successfully",
         data: user,
         resumeUrl,
       });
     } catch (error: any) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: error.message,
       });

@@ -1,35 +1,45 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import "./SavedJobs.css";
 
 interface Job {
   _id: string;
   title: string;
-  company: string;
-  location: string;
-  employmentType: string;
-  salary?: number;
-  skills?: string[];
+  company?: string;
   description?: string;
+  location?: string;
+  salary?: number;
+  employmentType?: string;
+  experience?: string;
+  skills?: string[];
+  recruiter?: any;
+  createdAt?: string;
 }
 
 interface SavedJob {
   _id: string;
+  student: string;
   job: Job;
-  createdAt: string;
+  createdAt?: string;
 }
 
-function SavedJobs() {
+const API_URL = "http://localhost:5000/api";
+
+const SavedJobs = () => {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("All Jobs");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  const token = localStorage.getItem("token");
+  const [removingJobId, setRemovingJobId] =
+    useState<string | null>(null);
 
-  /* ================================
-     FETCH SAVED JOBS
-  ================================= */
+  const [applyingJobId, setApplyingJobId] =
+    useState<string | null>(null);
+
+  const [selectedJob, setSelectedJob] =
+    useState<Job | null>(null);
+
+  // =========================================
+  // FETCH SAVED JOBS
+  // =========================================
 
   useEffect(() => {
     fetchSavedJobs();
@@ -37,159 +47,213 @@ function SavedJobs() {
 
   const fetchSavedJobs = async () => {
     try {
-      setLoading(true);
-      setError("");
+      const token = localStorage.getItem("token");
 
       if (!token) {
-        setError("Please login to view saved jobs.");
+        setLoading(false);
         return;
       }
 
+      setLoading(true);
+
       const response = await fetch(
-        "http://localhost:5000/api/saved-jobs/",
+        `${API_URL}/saved-jobs/`,
         {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
         }
       );
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || "Failed to fetch saved jobs"
+      if (!response.ok || !result.success) {
+        console.error(
+          result.message || "Unable to fetch saved jobs"
         );
+
+        setSavedJobs([]);
+        return;
       }
 
-      setSavedJobs(data.data || []);
-    } catch (err: any) {
-      console.error("Saved jobs error:", err);
-
-      setError(
-        err.message || "Unable to load saved jobs."
+      setSavedJobs(result.data || []);
+    } catch (error) {
+      console.error(
+        "Failed to fetch saved jobs:",
+        error
       );
+
+      setSavedJobs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /* ================================
-     REMOVE SAVED JOB
-  ================================= */
+  // =========================================
+  // REMOVE SAVED JOB
+  // =========================================
 
   const removeSavedJob = async (jobId: string) => {
     try {
+      const token = localStorage.getItem("token");
+
+      if (!token) {
+        alert("Please login first.");
+        return;
+      }
+
+      setRemovingJobId(jobId);
+
       const response = await fetch(
-        `http://localhost:5000/api/saved-jobs/${jobId}`,
+        `${API_URL}/saved-jobs/${jobId}`,
         {
           method: "DELETE",
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
           },
         }
       );
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message ||
-            "Failed to remove saved job"
+      if (!response.ok || !result.success) {
+        alert(
+          result.message ||
+            "Unable to remove saved job."
         );
+        return;
       }
 
+      // Remove from current list
       setSavedJobs((previous) =>
         previous.filter(
-          (savedJob) =>
-            savedJob.job._id !== jobId
+          (saved) =>
+            saved.job?._id !== jobId
         )
       );
-    } catch (err: any) {
-      console.error("Remove saved job error:", err);
+
+      // Close modal if this job was open
+      if (selectedJob?._id === jobId) {
+        setSelectedJob(null);
+      }
+    } catch (error) {
+      console.error(
+        "Remove saved job error:",
+        error
+      );
 
       alert(
-        err.message ||
-          "Unable to remove saved job."
+        "Unable to remove saved job."
       );
+    } finally {
+      setRemovingJobId(null);
     }
   };
 
-  /* ================================
-     FILTER + SEARCH
-  ================================= */
+  // =========================================
+  // APPLY FOR JOB
+  // =========================================
 
-  const filteredJobs = useMemo(() => {
-    return savedJobs.filter((savedJob) => {
-      const job = savedJob.job;
+  const applyForJob = async (jobId: string) => {
+    try {
+      const token = localStorage.getItem("token");
 
-      if (!job) {
-        return false;
+      if (!token) {
+        alert("Please login first.");
+        return;
       }
 
-      const searchText =
-        search.toLowerCase().trim();
+      setApplyingJobId(jobId);
 
-      const matchesSearch =
-        job.title
-          ?.toLowerCase()
-          .includes(searchText) ||
-        job.company
-          ?.toLowerCase()
-          .includes(searchText) ||
-        job.location
-          ?.toLowerCase()
-          .includes(searchText);
-
-      const matchesFilter =
-        filter === "All Jobs" ||
-        job.employmentType === filter;
-
-      return (
-        matchesSearch &&
-        matchesFilter
+      const response = await fetch(
+        `${API_URL}/applications/${jobId}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            coverLetter: "",
+          }),
+        }
       );
-    });
-  }, [savedJobs, search, filter]);
 
-  /* ================================
-     VIEW JOB
-  ================================= */
+      const result = await response.json();
 
-  const viewJob = (job: Job) => {
-    alert(
-      `${job.title}\n\n${job.company}\n${job.location}`
-    );
+      if (!response.ok || !result.success) {
+        alert(
+          result.message ||
+            "Unable to apply for this job."
+        );
+        return;
+      }
+
+      alert(
+        "Application submitted successfully!"
+      );
+
+      setSelectedJob(null);
+    } catch (error) {
+      console.error(
+        "Application error:",
+        error
+      );
+
+      alert(
+        "Unable to submit application."
+      );
+    } finally {
+      setApplyingJobId(null);
+    }
   };
 
-  /* ================================
-     APPLY
-  ================================= */
+  // =========================================
+  // FORMAT SALARY
+  // =========================================
 
-  const applyToJob = (job: Job) => {
-    alert(
-      `Application for "${job.title}" will be opened.`
-    );
-  };
-
-  /* ================================
-     FORMAT DATE
-  ================================= */
-
-  const formatSavedDate = (
-    date: string
+  const formatSalary = (
+    salary?: number
   ) => {
-    const savedDate = new Date(date);
-
-    if (Number.isNaN(savedDate.getTime())) {
-      return "";
+    if (!salary) {
+      return "Not disclosed";
     }
 
-    return savedDate.toLocaleDateString(
-      "en-US",
+    return `₹${salary.toLocaleString(
+      "en-IN"
+    )}`;
+  };
+
+  // =========================================
+  // COMPANY INITIAL
+  // =========================================
+
+  const getCompanyInitial = (
+    company?: string
+  ) => {
+    if (!company) {
+      return "C";
+    }
+
+    return company
+      .charAt(0)
+      .toUpperCase();
+  };
+
+  // =========================================
+  // FORMAT DATE
+  // =========================================
+
+  const formatDate = (
+    date?: string
+  ) => {
+    if (!date) {
+      return "Recently";
+    }
+
+    return new Date(date).toLocaleDateString(
+      "en-IN",
       {
         day: "numeric",
         month: "short",
@@ -198,39 +262,60 @@ function SavedJobs() {
     );
   };
 
-  /* ================================
-     COMPANY INITIAL
-  ================================= */
+  // =========================================
+  // NO TOKEN
+  // =========================================
 
-  const getCompanyInitial = (
-    company?: string
-  ) => {
-    if (!company) {
-      return "J";
-    }
+  if (!localStorage.getItem("token")) {
+    return (
+      <div className="saved-jobs-page">
 
-    return company
-      .charAt(0)
-      .toUpperCase();
-  };
+        <div className="saved-empty-state">
+
+          <div className="empty-icon">
+            🔒
+          </div>
+
+          <h2>
+            Login Required
+          </h2>
+
+          <p>
+            Please login to view your
+            saved jobs.
+          </p>
+
+        </div>
+
+      </div>
+    );
+  }
 
   return (
     <div className="saved-jobs-page">
 
-      {/* ================= HEADER ================= */}
+      {/* =====================================
+          PAGE HEADER
+      ===================================== */}
 
       <div className="saved-jobs-header">
 
         <div>
-          <h1>Saved Jobs</h1>
+          <span className="saved-label">
+            YOUR JOBS
+          </span>
+
+          <h1>
+            Saved Jobs
+          </h1>
 
           <p>
-            Jobs you've saved for later. Apply when
-            you're ready.
+            Jobs you've saved for
+            later.
           </p>
         </div>
 
-        <div className="saved-count-card">
+        <div className="saved-count">
 
           <strong>
             {savedJobs.length}
@@ -244,163 +329,70 @@ function SavedJobs() {
 
       </div>
 
-      {/* ================= SEARCH ================= */}
 
-      <div className="saved-search-section">
+      {/* =====================================
+          CONTENT
+      ===================================== */}
 
-        <div className="saved-search-box">
+      <main className="saved-jobs-content">
 
-          <span className="search-icon">
-            ⌕
-          </span>
+        {/* LOADING */}
 
-          <input
-            type="text"
-            placeholder="Search saved jobs..."
-            value={search}
-            onChange={(event) =>
-              setSearch(event.target.value)
-            }
-          />
+        {loading && (
+          <div className="saved-loading">
 
-        </div>
-
-        <select
-          className="saved-filter"
-          value={filter}
-          onChange={(event) =>
-            setFilter(event.target.value)
-          }
-        >
-          <option>
-            All Jobs
-          </option>
-
-          <option value="Full-Time">
-            Full-Time
-          </option>
-
-          <option value="Part-Time">
-            Part-Time
-          </option>
-
-          <option value="Internship">
-            Internship
-          </option>
-
-          <option value="Contract">
-            Contract
-          </option>
-
-        </select>
-
-      </div>
-
-      {/* ================= ERROR ================= */}
-
-      {error && (
-        <div
-          style={{
-            background: "#fff0f0",
-            border: "1px solid #ffd5d5",
-            color: "#c43d3d",
-            padding: "14px 18px",
-            borderRadius: "10px",
-            marginBottom: "20px",
-            fontSize: "14px",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {/* ================= MAIN CARD ================= */}
-
-      <div className="saved-jobs-card">
-
-        <div className="saved-jobs-card-header">
-
-          <div>
-
-            <h2>
-              Your Saved Jobs
-            </h2>
+            <div className="loading-spinner"></div>
 
             <p>
-              Keep track of opportunities you're
-              interested in.
-            </p>
-
-          </div>
-
-          <span className="jobs-count">
-            {filteredJobs.length} jobs
-          </span>
-
-        </div>
-
-        {/* ================= LOADING ================= */}
-
-        {loading ? (
-
-          <div className="saved-empty">
-
-            <div className="empty-icon">
-              ⏳
-            </div>
-
-            <h3>
               Loading saved jobs...
-            </h3>
-
-            <p>
-              Please wait while we fetch your
-              saved jobs.
             </p>
 
           </div>
+        )}
 
-        ) : filteredJobs.length === 0 ? (
 
-          /* ================= EMPTY ================= */
+        {/* EMPTY */}
 
-          <div className="saved-empty">
+        {!loading &&
+          savedJobs.length === 0 && (
+            <div className="saved-empty-state">
 
-            <div className="empty-icon">
-              ♡
+              <div className="empty-icon">
+                ♡
+              </div>
+
+              <h2>
+                No Saved Jobs Yet
+              </h2>
+
+              <p>
+                When you find a job you like,
+                save it here so you can easily
+                apply later.
+              </p>
+
             </div>
+          )}
 
-            <h3>
-              {savedJobs.length === 0
-                ? "No saved jobs yet"
-                : "No saved jobs found"}
-            </h3>
 
-            <p>
-              {savedJobs.length === 0
-                ? "Save jobs you're interested in and they will appear here."
-                : "Try changing your search or filter."}
-            </p>
+        {/* SAVED JOBS */}
 
-          </div>
+        {!loading &&
+          savedJobs.length > 0 && (
+            <div className="saved-jobs-list">
 
-        ) : (
+              {savedJobs.map((saved) => {
 
-          /* ================= JOB LIST ================= */
+                const job = saved.job;
 
-          <div className="saved-job-list">
-
-            {filteredJobs.map(
-              (savedJob) => {
-
-                const job =
-                  savedJob.job;
+                if (!job) {
+                  return null;
+                }
 
                 return (
-
                   <div
-                    className="saved-job-item"
-                    key={savedJob._id}
+                    className="saved-job-card"
+                    key={saved._id}
                   >
 
                     {/* COMPANY LOGO */}
@@ -411,155 +403,317 @@ function SavedJobs() {
                       )}
                     </div>
 
-                    {/* JOB CONTENT */}
 
-                    <div className="saved-job-content">
+                    {/* JOB INFORMATION */}
 
-                      <h3>
-                        {job.title}
-                      </h3>
+                    <div className="saved-job-info">
 
-                      <div className="saved-company">
-                        {job.company}
+                      <div className="saved-job-title-row">
+
+                        <h3>
+                          {job.title}
+                        </h3>
+
+                        <span className="saved-job-badge">
+                          SAVED
+                        </span>
+
                       </div>
 
-                      <div className="saved-job-details">
+                      <p className="saved-company">
+                        {job.company ||
+                          "Company"}
+                      </p>
+
+
+                      {/* META */}
+
+                      <div className="saved-job-meta">
 
                         <span>
-                          📍 {job.location}
+                          📍{" "}
+                          {job.location ||
+                            "Remote"}
                         </span>
 
                         <span>
                           💼{" "}
-                          {job.employmentType}
+                          {job.employmentType ||
+                            "Not specified"}
                         </span>
 
-                        {job.salary && (
-                          <span>
-                            💰 ₹
-                            {job.salary.toLocaleString()}
-                          </span>
-                        )}
-
                         <span>
-                          ◷ Saved{" "}
-                          {formatSavedDate(
-                            savedJob.createdAt
+                          💰{" "}
+                          {formatSalary(
+                            job.salary
                           )}
                         </span>
 
-                      </div>
-
-                      {/* SKILLS */}
-
-                      {job.skills &&
-                        job.skills.length > 0 && (
-
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "7px",
-                              flexWrap: "wrap",
-                              marginTop: "15px",
-                            }}
-                          >
-
-                            {job.skills
-                              .slice(0, 5)
-                              .map(
-                                (skill) => (
-
-                                  <span
-                                    key={skill}
-                                    style={{
-                                      background:
-                                        "#f0efff",
-                                      color:
-                                        "#635bff",
-                                      padding:
-                                        "5px 9px",
-                                      borderRadius:
-                                        "6px",
-                                      fontSize:
-                                        "11px",
-                                      fontWeight:
-                                        "600",
-                                    }}
-                                  >
-                                    {skill}
-                                  </span>
-
-                                )
-                              )}
-
-                          </div>
-
-                        )}
-
-                      {/* SAVED BADGE */}
-
-                      <div className="saved-job-bottom">
-
-                        <span className="saved-badge">
-                          ♥ Saved
+                        <span>
+                          🎓{" "}
+                          {job.experience ||
+                            "Not specified"}
                         </span>
 
                       </div>
 
+
+                      {/* SKILLS */}
+
+                      <div className="saved-job-skills">
+
+                        {(job.skills || [])
+                          .slice(0, 5)
+                          .map(
+                            (skill) => (
+                              <span
+                                className="skill-tag"
+                                key={skill}
+                              >
+                                {skill}
+                              </span>
+                            )
+                          )}
+
+                      </div>
+
+
+                      {/* SAVED DATE */}
+
+                      <p className="saved-date">
+                        Saved on{" "}
+                        {formatDate(
+                          saved.createdAt
+                        )}
+                      </p>
+
                     </div>
 
-                    {/* REMOVE */}
-
-                    <button
-                      className="remove-save-btn"
-                      onClick={() =>
-                        removeSavedJob(
-                          job._id
-                        )
-                      }
-                      title="Remove saved job"
-                    >
-                      ♥
-                    </button>
 
                     {/* ACTIONS */}
 
                     <div className="saved-job-actions">
 
                       <button
-                        className="view-job-btn"
+                        className="remove-saved-button"
+                        disabled={
+                          removingJobId ===
+                          job._id
+                        }
                         onClick={() =>
-                          viewJob(job)
+                          removeSavedJob(
+                            job._id
+                          )
                         }
                       >
-                        View Job
+                        {removingJobId ===
+                        job._id
+                          ? "Removing..."
+                          : "♥ Saved"}
                       </button>
 
                       <button
-                        className="apply-now-btn"
+                        className="saved-view-button"
                         onClick={() =>
-                          applyToJob(job)
+                          setSelectedJob(
+                            job
+                          )
                         }
                       >
-                        Apply Now
+                        View Details
                       </button>
 
                     </div>
 
                   </div>
-
                 );
+              })}
+
+            </div>
+          )}
+
+      </main>
+
+
+      {/* =====================================
+          JOB DETAILS MODAL
+      ===================================== */}
+
+      {selectedJob && (
+        <div
+          className="saved-modal-overlay"
+          onClick={() =>
+            setSelectedJob(null)
+          }
+        >
+
+          <div
+            className="saved-modal"
+            onClick={(e) =>
+              e.stopPropagation()
+            }
+          >
+
+            {/* CLOSE */}
+
+            <button
+              className="saved-modal-close"
+              onClick={() =>
+                setSelectedJob(null)
               }
-            )}
+            >
+              ×
+            </button>
+
+
+            {/* HEADER */}
+
+            <div className="saved-modal-header">
+
+              <div className="saved-modal-logo">
+                {getCompanyInitial(
+                  selectedJob.company
+                )}
+              </div>
+
+              <div>
+
+                <h2>
+                  {selectedJob.title}
+                </h2>
+
+                <p>
+                  {selectedJob.company ||
+                    "Company"}
+                </p>
+
+              </div>
+
+            </div>
+
+
+            {/* META */}
+
+            <div className="saved-modal-meta">
+
+              <span>
+                📍{" "}
+                {selectedJob.location ||
+                  "Remote"}
+              </span>
+
+              <span>
+                💼{" "}
+                {selectedJob.employmentType ||
+                  "Not specified"}
+              </span>
+
+              <span>
+                💰{" "}
+                {formatSalary(
+                  selectedJob.salary
+                )}
+              </span>
+
+              <span>
+                🎓{" "}
+                {selectedJob.experience ||
+                  "Not specified"}
+              </span>
+
+            </div>
+
+
+            {/* DESCRIPTION */}
+
+            <div className="saved-modal-section">
+
+              <h3>
+                Job Description
+              </h3>
+
+              <p>
+                {selectedJob.description ||
+                  "No job description available."}
+              </p>
+
+            </div>
+
+
+            {/* SKILLS */}
+
+            <div className="saved-modal-section">
+
+              <h3>
+                Required Skills
+              </h3>
+
+              <div className="saved-modal-skills">
+
+                {(selectedJob.skills || [])
+                  .map((skill) => (
+                    <span
+                      className="skill-tag"
+                      key={skill}
+                    >
+                      {skill}
+                    </span>
+                  ))}
+
+              </div>
+
+            </div>
+
+
+            {/* ACTIONS */}
+
+            <div className="saved-modal-actions">
+
+              <button
+                className="modal-remove-button"
+                disabled={
+                  removingJobId ===
+                  selectedJob._id
+                }
+                onClick={() =>
+                  removeSavedJob(
+                    selectedJob._id
+                  )
+                }
+              >
+                {removingJobId ===
+                selectedJob._id
+                  ? "Removing..."
+                  : "♥ Remove Saved"}
+              </button>
+
+              <button
+                className="modal-apply-button"
+                disabled={
+                  applyingJobId ===
+                  selectedJob._id
+                }
+                onClick={() =>
+                  applyForJob(
+                    selectedJob._id
+                  )
+                }
+              >
+                {applyingJobId ===
+                selectedJob._id
+                  ? "Submitting..."
+                  : "Apply Now"}
+              </button>
+
+            </div>
 
           </div>
 
-        )}
-
-      </div>
+        </div>
+      )}
 
     </div>
   );
-}
+};
 
 export default SavedJobs;
