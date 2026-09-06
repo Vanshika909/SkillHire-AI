@@ -451,3 +451,32 @@
   color: #888;
   font-weight: 600;
 }
+
+.admin-application-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+
+.admin-filter-button {
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #555;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-filter-button:hover {
+  background: #f5f5f5;
+}
+
+.admin-filter-button.active {
+  background: #4f46e5;
+  color: #fff;
+  border-color: #4f46e5;
+}

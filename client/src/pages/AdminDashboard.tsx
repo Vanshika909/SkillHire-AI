@@ -66,7 +66,10 @@ const AdminDashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
+ const [applicationFilter, setApplicationFilter] =
+  useState<
+    "All" | "Pending" | "Shortlisted" | "Rejected" | "Hired"
+  >("All");
   const token = localStorage.getItem("token");
 
   const authHeaders = {
@@ -409,6 +412,14 @@ const AdminDashboard = () => {
       </div>
     );
   }
+
+  const filteredApplications =
+  applicationFilter === "All"
+    ? applications
+    : applications.filter(
+        (application) =>
+          application.status === applicationFilter
+      );
 
   return (
     <div className="admin-page">
@@ -994,12 +1005,41 @@ const AdminDashboard = () => {
             </div>
 
             <span className="admin-count">
-              {applications.length} applications
+              {filteredApplications.length} applications
             </span>
 
           </div>
-
-          {applications.length === 0 ? (
+          <div className="admin-application-filters">
+  {[
+    "All",
+    "Pending",
+    "Shortlisted",
+    "Rejected",
+    "Hired",
+  ].map((filter) => (
+    <button
+      key={filter}
+      className={
+        applicationFilter === filter
+          ? "admin-filter-button active"
+          : "admin-filter-button"
+      }
+      onClick={() =>
+        setApplicationFilter(
+          filter as
+            | "All"
+            | "Pending"
+            | "Shortlisted"
+            | "Rejected"
+            | "Hired"
+        )
+      }
+    >
+      {filter}
+    </button>
+  ))}
+</div>
+          {filteredApplications.length === 0 ? (
             <div className="admin-empty">
               No applications found.
             </div>
@@ -1021,7 +1061,7 @@ const AdminDashboard = () => {
 
                 <tbody>
 
-                  {applications.map(
+                  {filteredApplications.map(
                     (application) => (
                       <tr
                         key={application._id}

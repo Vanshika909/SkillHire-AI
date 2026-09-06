@@ -29,7 +29,7 @@ function Notifications() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/notifications/",
+        import.meta.env.VITE_API_URL || "http://localhost:5000/api/notifications/",
         {
           headers: {
             Authorization: `Bearer ${token}`,

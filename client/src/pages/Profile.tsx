@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import "./Profile.css";
 
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
+
 interface ProfileData {
   _id: string;
   name: string;
@@ -43,7 +47,7 @@ const Profile = () => {
         setError("");
 
         const response = await fetch(
-          "http://localhost:5000/api/student/profile",
+          `${API}/student/profile`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -156,7 +160,7 @@ const Profile = () => {
       uploadData.append("avatar", file);
 
       const response = await fetch(
-        "http://localhost:5000/api/student/profile/avatar",
+        `${API}/student/profile/avatar`,
         {
           method: "POST",
           headers: {
@@ -219,7 +223,7 @@ const Profile = () => {
         .filter(Boolean);
 
       const response = await fetch(
-        "http://localhost:5000/api/student/profile",
+        `${API}/student/profile`,
         {
           method: "PUT",
           headers: {
@@ -350,7 +354,7 @@ const Profile = () => {
 
             {profile.avatar ? (
               <img
-                src={`http://localhost:5000${profile.avatar}`}
+                src={`${API}${profile.avatar}`}
                 alt="Profile"
               />
             ) : (
@@ -619,7 +623,7 @@ const Profile = () => {
 
                     const response =
                       await fetch(
-                        "http://localhost:5000/api/student/profile/resume",
+                        `${API}/student/profile/resume`,
                         {
                           method: "POST",
                           headers: {
@@ -694,7 +698,7 @@ const Profile = () => {
 
             {profile.resume && (
               <a
-                href={`http://localhost:5000${profile.resume}`}
+                href={`${API}${profile.resume}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="resume-view-link"

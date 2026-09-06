@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import "./Applications.css";
-
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 interface Job {
   _id: string;
   title: string;
@@ -46,8 +48,7 @@ function Applications() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        "http://localhost:5000/api/applications",
+      const response = await fetch(`${API}/applications`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -101,7 +102,7 @@ function Applications() {
       setWithdrawingId(id);
 
       const response = await fetch(
-        `http://localhost:5000/api/applications/${id}`,
+        `${API}/applications/${id}`,
         {
           method: "DELETE",
           headers: {

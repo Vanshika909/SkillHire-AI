@@ -32,7 +32,7 @@ interface Applicant {
   job?: Job;
 }
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL ||"http://localhost:5000/api";
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -634,7 +634,7 @@ const handleDeleteJob = async (jobId: string) => {
                           <div className="candidate-avatar">
                             {student?.avatar ? (
                               <img
-                                src={`http://localhost:5000${student.avatar}`}
+                                src={import.meta.env.VITE_API_URL ||`http://localhost:5000${student.avatar}`}
                                 alt=""
                               />
                             ) : (
@@ -985,7 +985,7 @@ const handleDeleteJob = async (jobId: string) => {
               <div className="candidate-avatar">
                 {student?.avatar ? (
                   <img
-                    src={`http://localhost:5000${student.avatar}`}
+                    src={import.meta.env.VITE_API_URL || `http://localhost:5000${student.avatar}`}
                     alt=""
                   />
                 ) : (
@@ -1028,7 +1028,7 @@ const handleDeleteJob = async (jobId: string) => {
             {student?.resume && (
               <a
                 className="resume-button"
-                href={`http://localhost:5000${student.resume}`}
+                href={import.meta.env.VITE_API_URL || `http://localhost:5000${student.resume}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >

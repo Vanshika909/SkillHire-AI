@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./RecruiterProfile.css";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL ||"http://localhost:5000/api";
 
 interface RecruiterProfileData {
   name: string;
@@ -298,7 +298,7 @@ const handleAvatarUpload = async (
   <div className="recruiter-profile-avatar">
     {profile.avatar ? (
       <img
-        src={`http://localhost:5000${profile.avatar}`}
+        src={import.meta.env.VITE_API_URL ||`http://localhost:5000${profile.avatar}`}
         alt="Profile"
       />
     ) : (
