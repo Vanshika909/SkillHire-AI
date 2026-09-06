@@ -66,3 +66,54 @@ export const getAllApplications = async () => {
     .populate("job", "title company")
     .sort({ createdAt: -1 });
 };
+
+// Delete a user
+export const deleteUser = async (
+  userId: string,
+  adminId: string
+) => {
+  // Prevent admin from deleting their own account
+  if (userId === adminId) {
+    throw new Error("You cannot delete your own admin account.");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  await User.findByIdAndDelete(userId);
+
+  return user;
+};
+
+// Change user role
+export const updateUserRole = async (
+  userId: string,
+  newRole: string,
+  adminId: string
+) => {
+  // Prevent admin from changing their own role
+  if (userId === adminId) {
+    throw new Error("You cannot change your own admin role.");
+  }
+
+  const allowedRoles = ["student", "recruiter", "admin"];
+
+  if (!allowedRoles.includes(newRole)) {
+    throw new Error("Invalid role.");
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error("User not found.");
+  }
+
+  user.role = newRole as "student" | "recruiter" | "admin";
+
+  await user.save();
+
+  return user;
+};

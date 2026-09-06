@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { protect, authorize } from "../middleware/auth.middleware";
-import { getDashboard, getUsers, getJobs, getApplications, } from "../controllers/admin.controller";
+import { getDashboard, getUsers, getJobs, getApplications, changeUserRole, removeUser, } from "../controllers/admin.controller";
 
 const router = Router();
 
@@ -33,6 +33,20 @@ router.get(
   protect,
   authorize("admin"),
   getApplications
+);
+
+router.delete(
+  "/users/:id",
+  protect,
+  authorize("admin"),
+  removeUser
+);
+
+router.put(
+  "/users/:id/role",
+  protect,
+  authorize("admin"),
+  changeUserRole
 );
 
 export default router;

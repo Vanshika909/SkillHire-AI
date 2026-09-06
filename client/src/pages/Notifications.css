@@ -279,3 +279,15 @@
     gap: 12px;
   }
 }
+.notification-row {
+  cursor: pointer;
+}
+
+.notification-row:focus {
+  outline: 2px solid #635bff;
+  outline-offset: -2px;
+}
+
+.notification-row:not(.unread) .new-badge {
+  display: none;
+}

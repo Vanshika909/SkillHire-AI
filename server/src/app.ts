@@ -11,6 +11,7 @@ import recruiterDashboardRoutes from "./routes/recruiterDashboard.routes";
 import adminRoutes from "./routes/admin.routes";
 import notificationRoutes from "./routes/notification.routes";
 import path from "path";
+import recruiterProfileRoutes from "./routes/recruiterProfile.routes";
 
 console.log("🔥 Notification routes imported");
 const app: Application = express();
@@ -35,6 +36,10 @@ app.use("/api/notifications", notificationRoutes);
 app.use(
   "/uploads",
   express.static(path.join(process.cwd(), "uploads"))
+);
+  app.use(
+  "/api/recruiter/profile",
+  recruiterProfileRoutes
 );
 
 // Health Check Route

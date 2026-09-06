@@ -9,7 +9,8 @@ import RecruiterDashboard from "./pages/RecruiterDashboard";
 
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
-
+import RecruiterProfile from "./pages/RecruiterProfile";
+import AdminDashboard from "./pages/AdminDashboard";
 interface Job {
   _id: string;
   title: string;
@@ -291,19 +292,19 @@ function App() {
 
           {/* DASHBOARD */}
 
-          <button
-            className={
-              page === "dashboard"
-                ? "nav-item active"
-                : "nav-item"
-            }
-            onClick={() =>
-              setPage("dashboard")
-            }
-          >
-            <span>⌂</span>
-            Dashboard
-          </button>
+           {userRole !== "admin" && (
+            <button
+              className={
+                page === "dashboard"
+                  ? "nav-item active"
+                  : "nav-item"
+              }
+              onClick={() => setPage("dashboard")}
+            >
+              <span>⌂</span>
+              Dashboard
+            </button>
+          )}
 
           {/* =========================
               STUDENT NAVIGATION
@@ -418,7 +419,25 @@ function App() {
               </button>
             </>
           )}
+          {/* =========================
+    ADMIN NAVIGATION
+========================= */}
 
+{userRole === "admin" && (
+  <>
+    <button
+      className={
+        page === "dashboard"
+          ? "nav-item active"
+          : "nav-item"
+      }
+      onClick={() => setPage("dashboard")}
+    >
+      <span>🛡️</span>
+      Admin Dashboard
+    </button>
+  </>
+)}
         </nav>
 
         {/* ---------- LOGOUT ---------- */}
@@ -458,8 +477,14 @@ function App() {
         ========================= */}
 
         {page === "dashboard" &&
+        
           userRole === "recruiter" && (
             <RecruiterDashboard />
+          )}
+
+        {page === "dashboard" &&
+          userRole === "admin" && (
+            <AdminDashboard />
           )}
 
         {/* =========================
@@ -801,13 +826,19 @@ function App() {
 
         {page === "notifications" &&
           userRole === "student" && (
-            <Notifications  onNavigate={(newPage) =>
-            setPage(newPage)} />
+            <Notifications  />
           )}
 
-        {page === "profile" && (
-          <Profile />
-        )}
+        {page === "profile" &&
+  userRole === "student" && (
+    <Profile />
+  )}
+
+{page === "profile" &&
+  userRole === "recruiter" && (
+    <RecruiterProfile />
+  )}
+        
 
         {/* =========================
             RECRUITER JOBS

@@ -8,13 +8,7 @@ interface Notification {
   createdAt: string;
 }
 
-interface NotificationsProps {
-  onNavigate?: (page: string) => void;
-}
-
-function Notifications({
-  onNavigate,
-}: NotificationsProps) {
+function Notifications() {
   const [notifications, setNotifications] = useState<
     Notification[]
   >([]);
@@ -45,9 +39,13 @@ function Notifications({
 
       const data = await response.json();
 
-      if (data.success) {
-        setNotifications(data.data || []);
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "Failed to load notifications"
+        );
       }
+
+      setNotifications(data.data || []);
     } catch (error) {
       console.error(
         "Failed to fetch notifications:",
@@ -59,7 +57,11 @@ function Notifications({
   };
 
   useEffect(() => {
-    fetchNotifications();
+    if (token) {
+      fetchNotifications();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   // ==========================================
@@ -67,39 +69,52 @@ function Notifications({
   // ==========================================
 
   const markAllAsRead = async () => {
-    try {
-      const unreadNotifications =
-        notifications.filter(
-          (notification) =>
-            !notification.isRead &&
-            !notification._id.startsWith("demo-")
-        );
+    const unreadNotifications = notifications.filter(
+      (notification) =>
+        !notification.isRead &&
+        !notification._id.startsWith("demo-")
+    );
 
+    if (unreadNotifications.length === 0) {
+      return;
+    }
+
+    // Update UI immediately
+    setNotifications((previous) =>
+      previous.map((notification) => ({
+        ...notification,
+        isRead: true,
+      }))
+    );
+
+    try {
       await Promise.all(
-        unreadNotifications.map((notification) =>
-          fetch(
+        unreadNotifications.map(async (notification) => {
+          const response = await fetch(
             `http://localhost:5000/api/notifications/${notification._id}/read`,
             {
-              method: "PUT",
+              method: "PATCH",
               headers: {
                 Authorization: `Bearer ${token}`,
               },
             }
-          )
-        )
-      );
+          );
 
-      setNotifications((previous) =>
-        previous.map((notification) => ({
-          ...notification,
-          isRead: true,
-        }))
+          if (!response.ok) {
+            throw new Error(
+              `Failed to mark ${notification._id} as read`
+            );
+          }
+        })
       );
     } catch (error) {
       console.error(
         "Failed to mark notifications as read:",
         error
       );
+
+      // Reload actual backend state if something failed
+      fetchNotifications();
     }
   };
 
@@ -110,71 +125,73 @@ function Notifications({
   const markAsRead = async (
     notification: Notification
   ) => {
-    // Demo notifications do not exist in database
     if (
-      notification._id.startsWith("demo-") ||
-      notification.isRead
+      notification.isRead ||
+      notification._id.startsWith("demo-")
     ) {
       return;
     }
+
+    // IMPORTANT:
+    // Update the screen immediately.
+    setNotifications((previous) =>
+      previous.map((item) =>
+        item._id === notification._id
+          ? {
+              ...item,
+              isRead: true,
+            }
+          : item
+      )
+    );
 
     try {
       const response = await fetch(
         `http://localhost:5000/api/notifications/${notification._id}/read`,
         {
-          method: "PUT",
+          method: "PATCH",
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      if (!response.ok) {
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
         throw new Error(
-          "Unable to mark notification as read"
+          result.message ||
+            "Unable to mark notification as read"
         );
       }
-
-      setNotifications((previous) =>
-        previous.map((item) =>
-          item._id === notification._id
-            ? {
-                ...item,
-                isRead: true,
-              }
-            : item
-        )
-      );
     } catch (error) {
       console.error(
         "Failed to mark notification as read:",
         error
       );
+
+      // Restore unread state if backend update fails
+      setNotifications((previous) =>
+        previous.map((item) =>
+          item._id === notification._id
+            ? {
+                ...item,
+                isRead: false,
+              }
+            : item
+        )
+      );
     }
   };
 
   // ==========================================
-  // HANDLE NOTIFICATION CLICK
+  // HANDLE CLICK
   // ==========================================
 
   const handleNotificationClick = async (
     notification: Notification
   ) => {
     await markAsRead(notification);
-
-    const category = getCategory(notification);
-
-    // Application notification
-    if (category === "Applications") {
-      onNavigate?.("applications");
-      return;
-    }
-
-    // Job notification
-    if (category === "Jobs") {
-      onNavigate?.("jobs");
-      return;
-    }
   };
 
   // ==========================================
@@ -295,7 +312,6 @@ function Notifications({
 
   const formatDate = (date: string) => {
     const notificationDate = new Date(date);
-
     const now = new Date();
 
     const difference =
@@ -311,10 +327,7 @@ function Notifications({
     const days = Math.floor(hours / 24);
 
     if (minutes < 60) {
-      return `${Math.max(
-        minutes,
-        1
-      )} min ago`;
+      return `${Math.max(minutes, 1)} min ago`;
     }
 
     if (hours < 24) {
@@ -362,7 +375,7 @@ function Notifications({
       message:
         "A new Software Engineer position matches your skills and preferences.",
       type: "Job",
-      isRead: false,
+      isRead: true,
       createdAt: new Date(
         Date.now() -
           24 * 60 * 60 * 1000
@@ -399,10 +412,14 @@ function Notifications({
       ? demoNotifications
       : [];
 
+  // ==========================================
+  // UI
+  // ==========================================
+
   return (
     <div className="notifications-page">
 
-      {/* ================= HEADER ================= */}
+      {/* HEADER */}
 
       <div className="notifications-header">
 
@@ -427,7 +444,7 @@ function Notifications({
 
       </div>
 
-      {/* ================= FILTERS ================= */}
+      {/* FILTERS */}
 
       <div className="notification-toolbar">
 
@@ -465,7 +482,7 @@ function Notifications({
 
       </div>
 
-      {/* ================= NOTIFICATIONS CARD ================= */}
+      {/* MAIN CARD */}
 
       <div className="notifications-card">
 
@@ -487,13 +504,16 @@ function Notifications({
 
         </div>
 
-        {/* ================= LOADING ================= */}
+        {/* LOADING */}
 
         {loading ? (
+
           <div className="notifications-loading">
             Loading notifications...
           </div>
+
         ) : displayNotifications.length === 0 ? (
+
           <div className="notifications-empty">
 
             <div>🔔</div>
@@ -507,7 +527,9 @@ function Notifications({
             </p>
 
           </div>
+
         ) : (
+
           <div className="notification-list">
 
             {displayNotifications.map(
@@ -546,11 +568,14 @@ function Notifications({
                     }
                     role="button"
                     tabIndex={0}
+                    title="Click to mark as read"
                     onKeyDown={(event) => {
                       if (
                         event.key === "Enter" ||
                         event.key === " "
                       ) {
+                        event.preventDefault();
+
                         handleNotificationClick(
                           notification
                         );
@@ -624,6 +649,7 @@ function Notifications({
             )}
 
           </div>
+
         )}
 
       </div>
