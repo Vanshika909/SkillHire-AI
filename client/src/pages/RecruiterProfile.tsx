@@ -298,7 +298,7 @@ const handleAvatarUpload = async (
   <div className="recruiter-profile-avatar">
     {profile.avatar ? (
       <img
-        src={import.meta.env.VITE_API_URL ||`http://localhost:5000${profile.avatar}`}
+        src={`${API}${profile.avatar}`}
         alt="Profile"
       />
     ) : (

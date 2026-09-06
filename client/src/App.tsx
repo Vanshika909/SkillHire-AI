@@ -11,6 +11,12 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import RecruiterProfile from "./pages/RecruiterProfile";
 import AdminDashboard from "./pages/AdminDashboard";
+
+
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
+
 interface Job {
   _id: string;
   title: string;
@@ -96,7 +102,7 @@ function App() {
 
     /* ---------- JOBS ---------- */
 
-    fetch("http://localhost:5000/api/jobs")
+    fetch(`${API}/jobs`)
       .then((res) => res.json())
       .then((result) => {
         if (result.success) {
@@ -110,7 +116,7 @@ function App() {
     /* ---------- STUDENT APPLICATIONS ---------- */
 
     if (userRole === "student") {
-      fetch("http://localhost:5000/api/applications", {
+      fetch(`${API}/applications`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -133,7 +139,7 @@ function App() {
 
     if (userRole === "student") {
       fetch(
-        "http://localhost:5000/api/student/profile",
+        `${API}/student/profile`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

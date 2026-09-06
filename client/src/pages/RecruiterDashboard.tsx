@@ -634,7 +634,7 @@ const handleDeleteJob = async (jobId: string) => {
                           <div className="candidate-avatar">
                             {student?.avatar ? (
                               <img
-                                src={import.meta.env.VITE_API_URL ||`http://localhost:5000${student.avatar}`}
+                                src={`${API}${student.avatar}`}
                                 alt=""
                               />
                             ) : (
@@ -985,7 +985,7 @@ const handleDeleteJob = async (jobId: string) => {
               <div className="candidate-avatar">
                 {student?.avatar ? (
                   <img
-                    src={import.meta.env.VITE_API_URL || `http://localhost:5000${student.avatar}`}
+                    src={`${API}${student.avatar}`}
                     alt=""
                   />
                 ) : (
@@ -1028,7 +1028,7 @@ const handleDeleteJob = async (jobId: string) => {
             {student?.resume && (
               <a
                 className="resume-button"
-                href={import.meta.env.VITE_API_URL || `http://localhost:5000${student.resume}`}
+                href={`${API}${student.resume}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
