@@ -1,6 +1,9 @@
 import { useState } from "react";
 import "./Auth.css";
 
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 interface LoginProps {
   onSignup: () => void;
   onLoginSuccess: () => void;
@@ -27,7 +30,7 @@ const Login = ({ onSignup, onLoginSuccess }: LoginProps) => {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/login",
+        `${API}/auth/login`,
         {
           method: "POST",
           headers: {
