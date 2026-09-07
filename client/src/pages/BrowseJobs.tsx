@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import "./BrowseJobs.css";
 
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
+  
 interface Job {
   _id: string;
   title: string;
@@ -15,7 +19,7 @@ interface Job {
   createdAt?: string;
 }
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${API}/jobs`;
 
 const BrowseJobs = () => {
   const [jobs, setJobs] = useState<Job[]>([]);

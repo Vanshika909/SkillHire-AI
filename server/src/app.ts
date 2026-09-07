@@ -19,8 +19,11 @@ const app: Application = express();
 // Middleware
 const allowedOrigins = [
   "http://localhost:5173",
+  "https://skillhire-ai-two.vercel.app",
+  "https://skillhire-pfgch4urx-vanshika-487f.vercel.app",
   process.env.CLIENT_URL,
-];
+].filter(Boolean);
+
 
 app.use(
   cors({

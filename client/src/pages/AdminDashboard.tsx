@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import "./AdminDashboard.css";
 
-const API = "http://localhost:5000/api";
+const API = import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 
 interface DashboardStats {
   totalUsers: number;

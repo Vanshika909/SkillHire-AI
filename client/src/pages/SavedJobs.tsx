@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import "./SavedJobs.css";
 
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 interface Job {
   _id: string;
   title: string;
@@ -22,7 +25,7 @@ interface SavedJob {
   createdAt?: string;
 }
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = `${API}/saved-jobs`;
 
 const SavedJobs = () => {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([]);

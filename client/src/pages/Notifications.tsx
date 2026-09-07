@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 
+const API =
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000/api";
 interface Notification {
   _id: string;
   message: string;
@@ -29,7 +32,7 @@ function Notifications() {
       setLoading(true);
 
       const response = await fetch(
-        import.meta.env.VITE_API_URL || "http://localhost:5000/api/notifications/",
+        `${API}/notifications/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -91,7 +94,7 @@ function Notifications() {
       await Promise.all(
         unreadNotifications.map(async (notification) => {
           const response = await fetch(
-            `http://localhost:5000/api/notifications/${notification._id}/read`,
+            `${API}/notifications/${notification._id}/read`,
             {
               method: "PATCH",
               headers: {
@@ -147,7 +150,7 @@ function Notifications() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/notifications/${notification._id}/read`,
+        `${API}/notifications/${notification._id}/read`,
         {
           method: "PATCH",
           headers: {
