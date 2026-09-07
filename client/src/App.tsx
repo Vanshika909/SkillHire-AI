@@ -13,9 +13,9 @@ import RecruiterProfile from "./pages/RecruiterProfile";
 import AdminDashboard from "./pages/AdminDashboard";
 
 
-const API =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000/api";
+const API = import.meta.env.PROD
+  ? "https://skillhire-ai-backend.onrender.com/api"
+  : "http://localhost:5000/api";
 
 interface Job {
   _id: string;

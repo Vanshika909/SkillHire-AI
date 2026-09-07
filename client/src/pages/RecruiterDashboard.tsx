@@ -32,7 +32,9 @@ interface Applicant {
   job?: Job;
 }
 
-const API = import.meta.env.VITE_API_URL ||"http://localhost:5000/api";
+const API = import.meta.env.PROD
+  ? "https://skillhire-ai-backend.onrender.com/api"
+  : "http://localhost:5000/api";
 
 const RecruiterDashboard = () => {
   const [jobs, setJobs] = useState<Job[]>([]);

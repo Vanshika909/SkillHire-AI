@@ -1,9 +1,9 @@
 import { useState } from "react";
 import "./Auth.css";
 
-const API =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000/api";
+const API = import.meta.env.PROD
+  ? "https://skillhire-ai-backend.onrender.com/api"
+  : "http://localhost:5000/api";
 interface LoginProps {
   onSignup: () => void;
   onLoginSuccess: () => void;
